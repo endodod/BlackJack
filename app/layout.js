@@ -1,7 +1,7 @@
 import '../src/index.css'
 import '../src/App.css'
-import '../src/components/BettingModal.css'
-import '../src/components/ResultsModal.css'
+import '../src/components/BettingPanel.css'
+import '../src/components/ResultPanel.css'
 
 export const metadata = {
   title: 'Blackjack',
