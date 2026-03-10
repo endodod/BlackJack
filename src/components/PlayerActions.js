@@ -1,3 +1,4 @@
+'use client'
 import Hit from './actions/Hit.js'
 import Stand from './actions/Stand.js'
 import Double from './actions/Double.js'

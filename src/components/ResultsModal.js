@@ -1,5 +1,5 @@
+'use client'
 import { useEffect, useRef } from 'react';
-import './ResultsModal.css';
 
 export default function ResultsModal({ result, amount, onClose }) {
   const isWin = result === 'Player Wins';

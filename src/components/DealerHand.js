@@ -1,3 +1,4 @@
+'use client'
 import getCardValue from '../logic/getCardValue';
 import Card from './Card';
 import { useDeck } from '../context/DeckContext';

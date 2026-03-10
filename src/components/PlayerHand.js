@@ -1,3 +1,4 @@
+'use client'
 import getCardValue from '../logic/getCardValue';
 import getHandTotal from '../logic/getHandTotal';
 import Card from './Card';

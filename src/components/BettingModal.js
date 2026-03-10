@@ -1,6 +1,6 @@
+'use client'
 import { useState } from 'react';
 import { useDeck } from '../context/DeckContext';
-import './BettingModal.css';
 
 export default function BettingModal({ onBetPlaced, autoDeal, setAutoDeal }) {
   const { bankroll, setCurrentBet } = useDeck();

@@ -1,3 +1,4 @@
+'use client'
 import React, { useEffect, useCallback } from "react";
 import { DeckContext } from "./context/DeckContext";
 import PlayerHand from './components/PlayerHand';
@@ -8,7 +9,6 @@ import ResultsModal from "./components/ResultsModal";
 import checkWinner from "./logic/checkWinner";
 import getHandTotal from "./logic/getHandTotal";
 import drawCard from "./logic/drawCard";
-import './App.css';
 
 function App() {
   

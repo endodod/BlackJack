@@ -1,3 +1,4 @@
+'use client'
 import { useDeck } from "../../context/DeckContext";
 
 export default function Stand() {
