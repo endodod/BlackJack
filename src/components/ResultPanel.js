@@ -22,11 +22,12 @@ function SplitHandResult({ label, result, amount }) {
 
 export default function ResultPanel({ result, amount, splitResults, onNext }) {
   useEffect(() => {
+    const timer = setTimeout(onNext, 1500);
     const handleKey = (e) => {
-      if (e.code === 'Space') { e.preventDefault(); onNext(); }
+      if (e.code === 'Space') { e.preventDefault(); clearTimeout(timer); onNext(); }
     };
     window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
+    return () => { clearTimeout(timer); window.removeEventListener('keydown', handleKey); };
   }, [onNext]);
 
   if (splitResults) {
@@ -38,7 +39,6 @@ export default function ResultPanel({ result, amount, splitResults, onNext }) {
           <div className="split-divider" />
           <SplitHandResult label="Hand 2" result={result2} amount={amount2} />
         </div>
-        <button className="next-hand-btn" onClick={onNext}>Next Hand →</button>
       </div>
     );
   }
@@ -59,7 +59,6 @@ export default function ResultPanel({ result, amount, splitResults, onNext }) {
         {isLoss && <span className="amount-loss">-${amount}</span>}
         {isPush && <span className="amount-push">Bet returned</span>}
       </div>
-      <button className="next-hand-btn" onClick={onNext}>Next Hand →</button>
     </div>
   );
 }
