@@ -2,14 +2,14 @@
 import { useDeck } from "../../context/DeckContext";
 import drawCard from "../../logic/drawCard";
 
-export default function Hit() {
+export default function Hit({ onValidate }) {
     const { deck, playerHand, setPlayerHand, setDeck, playerTurn } = useDeck();
 
     const handleHit = () => {
         // Only allow hit if it's player's turn and deck has cards
         if (playerTurn && deck.length > 0) {
+            if (onValidate) onValidate('hit');
             const {updatedHand, updatedDeck} = drawCard({hand: playerHand, deck: deck});
-            // Add 1 second delay after drawing
             setTimeout(() => {
                 setPlayerHand(updatedHand);
                 setDeck(updatedDeck);

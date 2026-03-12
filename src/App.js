@@ -5,13 +5,39 @@ import PlayerHand from './components/PlayerHand';
 import DealerHand from './components/DealerHand';
 import PlayerActions from "./components/PlayerActions";
 import BettingPanel from "./components/BettingPanel";
+import TrainingFeedback from "./components/TrainingFeedback";
 import ResultPanel from "./components/ResultPanel";
 import StatusBanner from "./components/StatusBanner";
 import checkWinner from "./logic/checkWinner";
 import getHandTotal from "./logic/getHandTotal";
 import drawCard from "./logic/drawCard";
+import { getBasicStrategyAction } from "./theory/basicStrategy";
 
 // gamePhase values: 'betting' | 'dealing' | 'player' | 'dealer' | 'pausing' | 'result'
+
+function classifyHandType(c0, c2) {
+  if (c0.value === c2.value) return 'pair';
+  if (c0.value === 'A' || c2.value === 'A') return 'soft';
+  return 'hard';
+}
+
+function findValidArrangement(deck, enabledTypes) {
+  if (enabledTypes.length === 0) return deck;
+  const n = deck.length;
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      if (i === j) continue;
+      if (enabledTypes.includes(classifyHandType(deck[i], deck[j]))) {
+        const d = [...deck];
+        [d[0], d[i]] = [d[i], d[0]];
+        const jAdj = j === 0 ? i : j;
+        [d[2], d[jAdj]] = [d[jAdj], d[2]];
+        return d;
+      }
+    }
+  }
+  return deck;
+}
 
 function App() {
   const {
@@ -30,6 +56,23 @@ function App() {
   const [statusMessage, setStatusMessage] = useState('');
   const [lastBetAmount, setLastBetAmount] = useState(0);
 
+  // Menu & settings state
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [volumeOn, setVolumeOn] = useState(true);
+  const [trainingMode, setTrainingMode] = useState('off');
+  const [showStats, setShowStats] = useState('off');
+  const [stats, setStats] = useState({ hands: 0, wins: 0, losses: 0, pushes: 0 });
+  const menuRef = useRef(null);
+
+  // Training practice state
+  const [practiceHardHands, setPracticeHardHands] = useState(true);
+  const [practiceSoftHands, setPracticeSoftHands] = useState(true);
+  const [practicePairs, setPracticePairs] = useState(true);
+  const [strategyStats, setStrategyStats] = useState({ total: 0, correct: 0 });
+  const [expectedAction, setExpectedAction] = useState(null);
+  const [actionFeedback, setActionFeedback] = useState(null);
+  const [trainingFeedback, setTrainingFeedback] = useState(null);
+
   // Split state
   const [splitHand2, setSplitHand2] = useState([]);                   // second hand (waiting to be played)
   const [splitHand1Completed, setSplitHand1Completed] = useState([]); // first hand (done)
@@ -39,6 +82,17 @@ function App() {
 
   // Prevents the game effect from re-entering during banner pauses.
   const gameTransitionRef = useRef(false);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [menuOpen]);
 
   const suits = ["♠", "♥", "♦", "♣"];
   const values = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
@@ -63,29 +117,71 @@ function App() {
     const result = checkWinner({ playerHand: playerH, dealerHand: dealerH });
     setWinner(result);
     const amount = betAmount != null ? betAmount : currentBet;
-    if (result === 'Player Wins') {
-      setBankroll(prev => prev + amount * 2);
-      setResultAmount(amount);
-    } else if (result === 'House Wins') {
-      setResultAmount(amount);
-    } else {
-      setBankroll(prev => prev + amount);
-      setResultAmount(0);
+    if (trainingMode !== 'basic') {
+      if (result === 'Player Wins') {
+        setBankroll(prev => prev + amount * 2);
+        setResultAmount(amount);
+      } else if (result === 'House Wins') {
+        setResultAmount(amount);
+      } else {
+        setBankroll(prev => prev + amount);
+        setResultAmount(0);
+      }
     }
     setResultMessage(result);
+    setStats(prev => ({
+      hands: prev.hands + 1,
+      wins: prev.wins + (result === 'Player Wins' ? 1 : 0),
+      losses: prev.losses + (result === 'House Wins' ? 1 : 0),
+      pushes: prev.pushes + (result === 'Push' ? 1 : 0),
+    }));
     return result;
-  }, [currentBet, setBankroll]);
+  }, [currentBet, setBankroll, trainingMode]);
+
+  // Ref always points to latest dealCards — used by effects to avoid stale closures
+  const dealCardsRef = useRef(null);
+
+  const cancelHand = useCallback(() => {
+    gameTransitionRef.current = false;
+    setPlayerHand([]);
+    setDealerHand([]);
+    setPlayerTurn(true);
+    setWinner(null);
+    setStatusMessage('');
+    setCurrentBet(0);
+    setSplitHand2([]);
+    setSplitHand1Completed([]);
+    setSplitBet(0);
+    setSplitHand1Bet(0);
+    setSplitResults(null);
+    setTrainingFeedback(null);
+    setExpectedAction(null);
+    setActionFeedback(null);
+    setGamePhase('betting');
+  }, [setPlayerHand, setDealerHand, setPlayerTurn, setCurrentBet]);
 
   const dealCards = useCallback((betAmount) => {
     gameTransitionRef.current = false;
+    setPlayerHand([]);
+    setDealerHand([]);
     setLastBetAmount(betAmount);
-    setBankroll(prev => prev - betAmount);
+    if (trainingMode !== 'basic') setBankroll(prev => prev - betAmount);
     setPlayerTurn(true);
     setGamePhase('dealing');
     setWinner(null);
     setStatusMessage('');
 
-    const c0 = deck[0], c1 = deck[1], c2 = deck[2], c3 = deck[3];
+    let workingDeck = deck;
+    if (trainingMode === 'basic') {
+      const enabledTypes = [
+        practiceHardHands && 'hard',
+        practiceSoftHands && 'soft',
+        practicePairs     && 'pair',
+      ].filter(Boolean);
+      workingDeck = findValidArrangement(deck, enabledTypes);
+    }
+
+    const c0 = workingDeck[0], c1 = workingDeck[1], c2 = workingDeck[2], c3 = workingDeck[3];
 
     setTimeout(() => setPlayerHand([c0]), 500);
     setTimeout(() => setDealerHand([c1]), 1000);
@@ -94,12 +190,15 @@ function App() {
       const finalPlayer = [c0, c2];
       const finalDealer = [c1, c3];
       setDealerHand(finalDealer);
-      setDeck(prev => prev.slice(4));
+      setDeck(workingDeck.slice(4));
 
       const playerTotal = getHandTotal(finalPlayer);
       const dealerTotal = getHandTotal(finalDealer);
 
-      if (playerTotal === 21 && dealerTotal === 21) {
+      if (trainingMode === 'basic' && (playerTotal === 21 || dealerTotal === 21)) {
+        // Blackjack in training: no decision to make, skip straight to next hand
+        setGamePhase('betting');
+      } else if (playerTotal === 21 && dealerTotal === 21) {
         setStatusMessage('Push! Both Blackjack!');
         setGamePhase('pausing');
         setTimeout(() => {
@@ -127,13 +226,31 @@ function App() {
         }, 1500);
       } else {
         setGamePhase('player');
+        // Set expected action synchronously (same batch as gamePhase) to avoid stale closure in handleActionValidation
+        if (trainingMode === 'basic') {
+          const canSplitNow = finalPlayer[0].value === finalPlayer[1].value;
+          setExpectedAction(getBasicStrategyAction(finalPlayer, finalDealer[0], true, canSplitNow));
+        }
       }
     }, 2000);
-  }, [deck, setDeck, setDealerHand, setPlayerHand, setPlayerTurn, setBankroll, resolveRound]);
+  }, [deck, setDeck, setDealerHand, setPlayerHand, setPlayerTurn, setBankroll, resolveRound,
+      trainingMode, practiceHardHands, practiceSoftHands, practicePairs]);
+
+  // Keep ref current so effects can call dealCards without stale closures
+  dealCardsRef.current = dealCards;
+
+  const handleActionValidation = useCallback((action) => {
+    if (trainingMode !== 'basic' || !expectedAction) return;
+    const isCorrect = action === expectedAction;
+    setStrategyStats(prev => ({ total: prev.total + 1, correct: prev.correct + (isCorrect ? 1 : 0) }));
+    setTrainingFeedback({ correct: isCorrect, expected: expectedAction });
+    setGamePhase('training-result');
+  }, [trainingMode, expectedAction]);
 
   const handleDouble = useCallback(() => {
-    if (playerHand.length !== 2 || currentBet > bankroll || deck.length === 0) return;
-    setBankroll(prev => prev - currentBet);
+    if (playerHand.length !== 2 || (trainingMode !== 'basic' && currentBet > bankroll) || deck.length === 0) return;
+    handleActionValidation('double');
+    if (trainingMode !== 'basic') setBankroll(prev => prev - currentBet);
     setCurrentBet(prev => prev * 2);
     const { updatedHand, updatedDeck } = drawCard({ hand: playerHand, deck });
     setTimeout(() => {
@@ -141,7 +258,8 @@ function App() {
       setDeck(updatedDeck);
       setPlayerTurn(false);
     }, 500);
-  }, [playerHand, currentBet, bankroll, deck, setBankroll, setCurrentBet, setPlayerHand, setDeck, setPlayerTurn]);
+  }, [playerHand, currentBet, bankroll, deck, setBankroll, setCurrentBet, setPlayerHand, setDeck, setPlayerTurn,
+      trainingMode, handleActionValidation]);
 
   const handleSplit = useCallback(() => {
     const isAlreadySplit = splitHand2.length > 0 || splitHand1Completed.length > 0;
@@ -150,23 +268,26 @@ function App() {
       playerHand[0]?.value !== playerHand[1]?.value ||
       isAlreadySplit ||
       deck.length < 2 ||
-      currentBet > bankroll
+      (trainingMode !== 'basic' && currentBet > bankroll)
     ) return;
 
+    handleActionValidation('split');
     const [card1, card2] = playerHand;
     const newCard1 = deck[0];
     const newCard2 = deck[1];
-    setBankroll(prev => prev - currentBet);
+    if (trainingMode !== 'basic') setBankroll(prev => prev - currentBet);
     setSplitBet(currentBet);
     setDeck(prev => prev.slice(2));
     setPlayerHand([card1, newCard1]);
     setSplitHand2([card2, newCard2]);
-  }, [playerHand, splitHand2, splitHand1Completed, currentBet, bankroll, deck, setBankroll, setDeck, setPlayerHand]);
+  }, [playerHand, splitHand2, splitHand1Completed, currentBet, bankroll, deck, setBankroll, setDeck, setPlayerHand,
+      trainingMode, handleActionValidation]);
 
   // Game logic: player bust/21 detection + dealer auto-play
   useEffect(() => {
     if (playerHand.length === 0 || dealerHand.length === 0) return;
     if (gameTransitionRef.current) return;
+    if (gamePhase === 'training-result') return;
 
     // Player stood → transition to hand 2 (split) or go to dealer
     if (gamePhase === 'player' && !playerTurn) {
@@ -292,10 +413,18 @@ function App() {
             // Split round: resolve both hands
             const result1 = checkWinner({ playerHand: ph1, dealerHand: dh });
             const result2 = checkWinner({ playerHand: ph, dealerHand: dh });
-            if (result1 === 'Player Wins') setBankroll(prev => prev + bet1 * 2);
-            else if (result1 === 'Push') setBankroll(prev => prev + bet1);
-            if (result2 === 'Player Wins') setBankroll(prev => prev + bet2 * 2);
-            else if (result2 === 'Push') setBankroll(prev => prev + bet2);
+            if (trainingMode !== 'basic') {
+              if (result1 === 'Player Wins') setBankroll(prev => prev + bet1 * 2);
+              else if (result1 === 'Push') setBankroll(prev => prev + bet1);
+              if (result2 === 'Player Wins') setBankroll(prev => prev + bet2 * 2);
+              else if (result2 === 'Push') setBankroll(prev => prev + bet2);
+            }
+            setStats(prev => ({
+              hands: prev.hands + 2,
+              wins: prev.wins + (result1 === 'Player Wins' ? 1 : 0) + (result2 === 'Player Wins' ? 1 : 0),
+              losses: prev.losses + (result1 === 'House Wins' ? 1 : 0) + (result2 === 'House Wins' ? 1 : 0),
+              pushes: prev.pushes + (result1 === 'Push' ? 1 : 0) + (result2 === 'Push' ? 1 : 0),
+            }));
             setSplitResults({ result1, result2, amount1: bet1, amount2: bet2 });
             setTimeout(() => setGamePhase('result'), 600);
           } else {
@@ -319,7 +448,7 @@ function App() {
     }
   }, [gamePhase, playerTurn, playerHand, dealerHand, deck, resolveRound,
       setDealerHand, setDeck, setPlayerTurn, setCurrentBet, setBankroll,
-      splitHand2, splitHand1Completed, splitBet, splitHand1Bet, currentBet]);
+      splitHand2, splitHand1Completed, splitBet, splitHand1Bet, currentBet, trainingMode]);
 
   const handleResultsClose = useCallback(() => {
     gameTransitionRef.current = false;
@@ -356,6 +485,7 @@ function App() {
       switch (key) {
         case 'w':
           if (deck.length > 0) {
+            handleActionValidation('hit');
             const { updatedHand, updatedDeck } = drawCard({ hand: playerHand, deck });
             setTimeout(() => {
               setPlayerHand(updatedHand);
@@ -364,6 +494,7 @@ function App() {
           }
           break;
         case 's':
+          handleActionValidation('stand');
           setPlayerTurn(false);
           break;
         case 'd':
@@ -379,7 +510,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [gamePhase, playerHand, deck, handleDouble, handleSplit, setPlayerHand, setDeck, setPlayerTurn]);
+  }, [gamePhase, playerHand, deck, handleDouble, handleSplit, setPlayerHand, setDeck, setPlayerTurn, handleActionValidation]);
 
   const handleReset = useCallback(() => {
     gameTransitionRef.current = false;
@@ -396,8 +527,33 @@ function App() {
     setSplitBet(0);
     setSplitHand1Bet(0);
     setSplitResults(null);
+    setStats({ hands: 0, wins: 0, losses: 0, pushes: 0 });
+    setStrategyStats({ total: 0, correct: 0 });
+    setExpectedAction(null);
+    setActionFeedback(null);
+    setMenuOpen(false);
     setGamePhase('betting');
   }, [setBankroll, setPlayerHand, setDealerHand, setPlayerTurn, setCurrentBet]);
+
+  useEffect(() => {
+    setExpectedAction(null);
+    setActionFeedback(null);
+    setTrainingFeedback(null);
+  }, [trainingMode]);
+
+  // Auto-advance from training-result: wait 1.8s then go back to betting (auto-deal fires below)
+  useEffect(() => {
+    if (gamePhase !== 'training-result') return;
+    const t = setTimeout(() => cancelHand(), 1800);
+    return () => clearTimeout(t);
+  }, [gamePhase, cancelHand]);
+
+  // Auto-deal next hand whenever training mode lands on betting phase
+  useEffect(() => {
+    if (trainingMode !== 'basic' || gamePhase !== 'betting') return;
+    const t = setTimeout(() => dealCardsRef.current?.(1), 350);
+    return () => clearTimeout(t);
+  }, [trainingMode, gamePhase]);
 
   const isSplitActive = splitHand2.length > 0 || splitHand1Completed.length > 0;
   const isOutOfMoney = gamePhase === 'betting' && bankroll < 10;
@@ -406,13 +562,117 @@ function App() {
     <div className="game-table">
       <header className="game-header">
         <span className="game-title">Blackjack</span>
-        <div className="game-hud">
-          <span className="hud-item">Bankroll: ${bankroll}</span>
-          {currentBet > 0 && <span className="hud-item hud-bet">Bet: ${currentBet}</span>}
+        {trainingMode === 'basic' ? (
+          <div className="game-bankroll">
+            <span className="hud-item training-badge">Training</span>
+          </div>
+        ) : (
+          <div className="game-bankroll">
+            <span className="hud-item">Bankroll: ${bankroll}</span>
+            {currentBet > 0 && <span className="hud-item hud-bet">Bet: ${currentBet}</span>}
+          </div>
+        )}
+        <div className="menu-container" ref={menuRef}>
+          <button
+            className={`burger-btn${menuOpen ? ' burger-btn-open' : ''}`}
+            onClick={() => setMenuOpen(o => !o)}
+            aria-label="Menu"
+          >
+            <span /><span /><span />
+          </button>
+          {menuOpen && (
+            <div className="menu-panel">
+              <div className="menu-row">
+                <span className="menu-label">Volume</span>
+                <button
+                  className={`menu-toggle${volumeOn ? ' menu-toggle-on' : ''}`}
+                  onClick={() => setVolumeOn(v => !v)}
+                >
+                  {volumeOn ? 'On' : 'Off'}
+                </button>
+              </div>
+              <div className="menu-section-label">Training Mode</div>
+              <div className="training-options">
+                {[['off', 'Off', false], ['basic', 'Basic Strategy', false], ['pro', 'Pro', true]].map(([val, label, soon]) => (
+                  <button
+                    key={val}
+                    className={`training-btn${trainingMode === val ? ' training-btn-active' : ''}${soon ? ' training-btn-soon' : ''}`}
+                    onClick={() => {
+                      if (soon || val === trainingMode) return;
+                      if (gamePhase !== 'betting') cancelHand();
+                      setTrainingMode(val);
+                      setMenuOpen(false);
+                    }}
+                    disabled={soon}
+                  >
+                    {label}{soon && <span className="soon-badge">Soon</span>}
+                  </button>
+                ))}
+              </div>
+              <div className="menu-section-label">Statistics</div>
+              <div className="training-options">
+                {[['off', 'Off', false], ['simple', 'Simple', false], ['detailed', 'Detailed', true]].map(([val, label, soon]) => (
+                  <button
+                    key={val}
+                    className={`training-btn${showStats === val ? ' training-btn-active' : ''}${soon ? ' training-btn-soon' : ''}`}
+                    onClick={() => !soon && setShowStats(val)}
+                    disabled={soon}
+                  >
+                    {label}{soon && <span className="soon-badge">Soon</span>}
+                  </button>
+                ))}
+              </div>
+              <div className="menu-divider" />
+              <button className="menu-reset-btn" onClick={handleReset}>
+                Reset
+              </button>
+            </div>
+          )}
         </div>
       </header>
 
       <div className="table-area">
+        {trainingMode === 'basic' && (() => {
+          const enabledCount = [practiceHardHands, practiceSoftHands, practicePairs].filter(Boolean).length;
+          const toggle = (setter) => {
+            setter(v => !v);
+            if (gamePhase !== 'betting') cancelHand();
+          };
+          return (
+            <div className="training-hand-panel">
+              <span className="training-hand-panel-label">Practice</span>
+              {[
+                ['Hard', practiceHardHands, () => toggle(setPracticeHardHands)],
+                ['Soft', practiceSoftHands, () => toggle(setPracticeSoftHands)],
+                ['Pairs', practicePairs,    () => toggle(setPracticePairs)],
+              ].map(([label, active, handler]) => (
+                <button
+                  key={label}
+                  className={`training-hand-btn${active ? ' training-hand-btn-on' : ''}`}
+                  onClick={handler}
+                  disabled={active && enabledCount === 1}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          );
+        })()}
+        {showStats !== 'off' && (
+          <div className="table-stats">
+            {trainingMode === 'basic' ? (
+              <>
+                <div className="table-stats-row"><span>Decisions</span><span>{strategyStats.total}</span></div>
+                <div className="table-stats-row table-stats-rate"><span>Correct</span><span>{strategyStats.total > 0 ? Math.round(strategyStats.correct / strategyStats.total * 100) : 0}%</span></div>
+              </>
+            ) : (
+              <>
+                <div className="table-stats-row"><span>Hands</span><span>{stats.hands}</span></div>
+                <div className="table-stats-row table-stats-rate"><span>Win %</span><span>{stats.hands > 0 ? Math.round(stats.wins / stats.hands * 100) : 0}%</span></div>
+              </>
+            )}
+          </div>
+        )}
         <DealerHand hand={dealerHand} gamePhase={gamePhase} />
         {statusMessage && <StatusBanner message={statusMessage} />}
         {isSplitActive ? (
@@ -434,7 +694,7 @@ function App() {
       </div>
 
       <div className="controls-bar">
-        {gamePhase === 'betting' && (
+        {gamePhase === 'betting' && trainingMode !== 'basic' && (
           <BettingPanel onDeal={dealCards} defaultBet={lastBetAmount} />
         )}
         {gamePhase === 'player' && !statusMessage && (
@@ -443,9 +703,14 @@ function App() {
             canDouble={canDouble}
             onDouble={handleDouble}
             onSplit={handleSplit}
+            onValidate={trainingMode === 'basic' ? handleActionValidation : undefined}
+            actionFeedback={actionFeedback}
           />
         )}
-        {gamePhase === 'result' && (
+        {gamePhase === 'training-result' && trainingFeedback && (
+          <TrainingFeedback feedback={trainingFeedback} onSkip={cancelHand} />
+        )}
+        {gamePhase === 'result' && trainingMode !== 'basic' && (
           <ResultPanel
             result={resultMessage}
             amount={resultAmount}
@@ -453,19 +718,19 @@ function App() {
             onNext={handleResultsClose}
           />
         )}
-        {(gamePhase === 'dealing' || gamePhase === 'dealer' || gamePhase === 'pausing' || (gamePhase === 'player' && statusMessage)) && (
+        {(gamePhase === 'dealing' || gamePhase === 'dealer' || gamePhase === 'pausing' || gamePhase === 'betting' && trainingMode === 'basic' || (gamePhase === 'player' && statusMessage)) && (
           <div className="waiting-indicator">
             <span className="waiting-dots">• • •</span>
           </div>
         )}
       </div>
-      {isOutOfMoney && (
+      {isOutOfMoney && trainingMode !== 'basic' && (
         <div className="broke-overlay">
           <div className="broke-modal">
             <h2 className="broke-title">You're broke!</h2>
             <p className="broke-subtitle">Not enough to place a bet.</p>
             <button className="broke-reset-btn" onClick={handleReset}>
-              Reset — $1000
+              Reset
             </button>
           </div>
         </div>

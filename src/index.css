@@ -14,5 +14,5 @@ html, body {
 
 #root {
   background-color: #08080e;
-  min-height: 100vh;
+  min-height: calc(var(--real-vh, 1vh) * 100);
 }
