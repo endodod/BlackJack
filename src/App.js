@@ -229,7 +229,7 @@ function App() {
         // Set expected action synchronously (same batch as gamePhase) to avoid stale closure in handleActionValidation
         if (trainingMode === 'basic') {
           const canSplitNow = finalPlayer[0].value === finalPlayer[1].value;
-          setExpectedAction(getBasicStrategyAction(finalPlayer, finalDealer[0], true, canSplitNow));
+          setExpectedAction(getBasicStrategyAction(finalPlayer, finalDealer[1], true, canSplitNow));
         }
       }
     }, 2000);
@@ -250,7 +250,8 @@ function App() {
   const handleDouble = useCallback(() => {
     if (playerHand.length !== 2 || (trainingMode !== 'basic' && currentBet > bankroll) || deck.length === 0) return;
     handleActionValidation('double');
-    if (trainingMode !== 'basic') setBankroll(prev => prev - currentBet);
+    if (trainingMode === 'basic') return;
+    setBankroll(prev => prev - currentBet);
     setCurrentBet(prev => prev * 2);
     const { updatedHand, updatedDeck } = drawCard({ hand: playerHand, deck });
     setTimeout(() => {
@@ -272,10 +273,11 @@ function App() {
     ) return;
 
     handleActionValidation('split');
+    if (trainingMode === 'basic') return;
     const [card1, card2] = playerHand;
     const newCard1 = deck[0];
     const newCard2 = deck[1];
-    if (trainingMode !== 'basic') setBankroll(prev => prev - currentBet);
+    setBankroll(prev => prev - currentBet);
     setSplitBet(currentBet);
     setDeck(prev => prev.slice(2));
     setPlayerHand([card1, newCard1]);
@@ -486,16 +488,18 @@ function App() {
         case 'w':
           if (deck.length > 0) {
             handleActionValidation('hit');
-            const { updatedHand, updatedDeck } = drawCard({ hand: playerHand, deck });
-            setTimeout(() => {
-              setPlayerHand(updatedHand);
-              setDeck(updatedDeck);
-            }, 500);
+            if (trainingMode !== 'basic') {
+              const { updatedHand, updatedDeck } = drawCard({ hand: playerHand, deck });
+              setTimeout(() => {
+                setPlayerHand(updatedHand);
+                setDeck(updatedDeck);
+              }, 500);
+            }
           }
           break;
         case 's':
           handleActionValidation('stand');
-          setPlayerTurn(false);
+          if (trainingMode !== 'basic') setPlayerTurn(false);
           break;
         case 'd':
           handleDouble();
