@@ -21,7 +21,7 @@ export default function RootLayout({ children }) {
               var h = window.innerHeight;
               var baseWidth;
               if (w < 930) {
-                baseWidth = h > w ? 700 : 900;
+                baseWidth = h > w ? 430 : 650;
               } else {
                 baseWidth = 1485;
               }
