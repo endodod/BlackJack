@@ -4,10 +4,17 @@ import { useEffect } from "react";
 export default function ScaleInit() {
   useEffect(() => {
     function applyScale() {
-      var baseWidth = 1485;
-      var scale = window.innerWidth / baseWidth;
+      var w = window.innerWidth;
+      var h = window.innerHeight;
+      var baseWidth;
+      if (w < 930) {
+        baseWidth = h > w ? 700 : 900;
+      } else {
+        baseWidth = 1485;
+      }
+      var scale = w / baseWidth;
       document.documentElement.style.zoom = scale;
-      var realVh = (window.innerHeight / scale) * 0.01;
+      var realVh = (h / scale) * 0.01;
       document.documentElement.style.setProperty('--real-vh', realVh + 'px');
     }
     applyScale();
