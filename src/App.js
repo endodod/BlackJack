@@ -17,6 +17,9 @@ import TestDealPanel from "./components/TestDealPanel";
 
 // gamePhase values: 'betting' | 'dealing' | 'player' | 'dealer' | 'pausing' | 'result'
 
+// Reshuffle when fewer than 25% of the 4-deck shoe remain (52 of 208 cards)
+const RESHUFFLE_THRESHOLD = Math.floor(4 * 52 * 0.25);
+
 function classifyHandType(c0, c2) {
   if (c0.value === c2.value) return 'pair';
   if (c0.value === 'A' || c2.value === 'A') return 'soft';
@@ -193,7 +196,19 @@ function App() {
     setWinner(null);
     setStatusMessage('');
 
+    // Reshuffle between hands if fewer than 25% of shoe remains
     let workingDeck = deck;
+    if (trainingMode !== 'basic' && deck.length < RESHUFFLE_THRESHOLD) {
+      const newDeck = [];
+      for (let i = 0; i < 4; i++)
+        for (const suit of suits)
+          for (const value of values)
+            newDeck.push({ suit, value });
+      newDeck.sort(() => Math.random() - 0.5);
+      workingDeck = newDeck;
+      setDeck(newDeck);
+    }
+
     if (trainingMode === 'basic') {
       const enabledTypes = [
         practiceHardHands && 'hard',
