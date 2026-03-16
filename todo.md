@@ -13,4 +13,6 @@
 [ ] - Singleplayer bots
 [ ] - Multiplayer bots
 [ ] - Redesign
+[ ] - Surrender / Insurance
+[ ] - Rule Variations
 [ ] - Mobile design
