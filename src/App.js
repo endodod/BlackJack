@@ -15,6 +15,7 @@ import drawCard from "./logic/drawCard";
 import { getBasicStrategyAction } from "./theory/basicStrategy";
 import StrategyTableModal from "./components/StrategyTableModal";
 import TestDealPanel from "./components/TestDealPanel";
+import Link from 'next/link';
 
 // gamePhase values: 'betting' | 'dealing' | 'player' | 'dealer' | 'pausing' | 'result'
 
@@ -56,7 +57,7 @@ function findValidArrangement(deck, enabledTypes) {
   return deck;
 }
 
-function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0 }, onRoundEnd }) {
+function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0 }, onRoundEnd, onShowAuth }) {
   const { data: session } = useSession();
   const {
     deck, setDeck,
@@ -78,7 +79,6 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0 }, onRou
   const [menuOpen, setMenuOpen] = useState(false);
   const [volumeOn, setVolumeOn] = useState(true);
   const [trainingMode, setTrainingMode] = useState('off');
-  const [showStats, setShowStats] = useState('off');
   const [stats, setStats] = useState(initialStats);
   const menuRef = useRef(null);
   const bankrollRef = useRef(bankroll);
@@ -626,25 +626,45 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0 }, onRou
   return (
     <div className="game-table">
       <header className="game-header">
-        <span className="game-title">Blackjack</span>
-        {trainingMode === 'basic' ? (
-          <div className="game-bankroll">
-            <span className="hud-item training-badge">Training</span>
-          </div>
-        ) : (
-          <div className="game-bankroll">
-            {session?.user?.username && <span className="hud-item hud-user">{session.user.username}</span>}
-            <span className="hud-item">Bankroll: ${bankroll}</span>
-            {currentBet > 0 && <span className="hud-item hud-bet">Bet: ${isSplitActive ? (splitHand1Completed.length > 0 ? splitHand1Bet : splitBet) + currentBet : currentBet}</span>}
-          </div>
-        )}
-        <div className="menu-container" ref={menuRef}>
+        <div className="game-header-left">
+          <span className="game-title">Blackjack</span>
+          <nav className="game-nav">
+            {[
+              ['off',   'Singleplayer', false],
+              ['multi', 'Multiplayer',  true],
+              ['basic', 'Training',     false],
+            ].map(([val, label, soon]) => (
+              <button
+                key={val}
+                className={`nav-btn${trainingMode === val ? ' nav-btn-active' : ''}${soon ? ' nav-btn-soon' : ''}`}
+                disabled={soon}
+                onClick={() => {
+                  if (soon || val === trainingMode) return;
+                  if (gamePhase !== 'betting') cancelHand();
+                  setTrainingMode(val);
+                }}
+              >
+                {label}{soon && <span className="soon-badge">Soon</span>}
+              </button>
+            ))}
+          </nav>
+        </div>
+        <div className="game-header-right">
+          {session?.user?.username && (
+            <Link href="/profile" className="hud-item hud-user hud-user-link">{session.user.username}</Link>
+          )}
+          {trainingMode !== 'basic' && <span className="hud-item">Bankroll: ${bankroll}</span>}
+          {trainingMode !== 'basic' && currentBet > 0 && <span className="hud-item hud-bet">Bet: ${isSplitActive ? (splitHand1Completed.length > 0 ? splitHand1Bet : splitBet) + currentBet : currentBet}</span>}
+          <div className="menu-container" ref={menuRef}>
           <button
-            className={`burger-btn${menuOpen ? ' burger-btn-open' : ''}`}
+            className={`settings-btn${menuOpen ? ' settings-btn-open' : ''}`}
             onClick={() => setMenuOpen(o => !o)}
-            aria-label="Menu"
+            aria-label="Settings"
           >
-            <span /><span /><span />
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
           </button>
           {menuOpen && (
             <div className="menu-panel">
@@ -657,41 +677,17 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0 }, onRou
                   {volumeOn ? 'On' : 'Off'}
                 </button>
               </div>
-              <div className="menu-section-label">Training Mode</div>
-              <div className="training-options">
-                {[['off', 'Off', false], ['basic', 'Basic Strategy', false], ['pro', 'Pro', true]].map(([val, label, soon]) => (
+              {!session?.user && onShowAuth && (
+                <>
+                  <div className="menu-divider" />
                   <button
-                    key={val}
-                    className={`training-btn${trainingMode === val ? ' training-btn-active' : ''}${soon ? ' training-btn-soon' : ''}`}
-                    onClick={() => {
-                      if (soon || val === trainingMode) return;
-                      if (gamePhase !== 'betting') cancelHand();
-                      setTrainingMode(val);
-                      setMenuOpen(false);
-                    }}
-                    disabled={soon}
+                    className="menu-auth-btn"
+                    onClick={() => { setMenuOpen(false); onShowAuth(); }}
                   >
-                    {label}{soon && <span className="soon-badge">Soon</span>}
+                    Sign In / Register
                   </button>
-                ))}
-              </div>
-              <div className="menu-section-label">Statistics</div>
-              <div className="training-options">
-                {[['off', 'Off', false], ['simple', 'Simple', false], ['detailed', 'Detailed', true]].map(([val, label, soon]) => (
-                  <button
-                    key={val}
-                    className={`training-btn${showStats === val ? ' training-btn-active' : ''}${soon ? ' training-btn-soon' : ''}`}
-                    onClick={() => !soon && setShowStats(val)}
-                    disabled={soon}
-                  >
-                    {label}{soon && <span className="soon-badge">Soon</span>}
-                  </button>
-                ))}
-              </div>
-              <div className="menu-divider" />
-              <button className="menu-reset-btn" onClick={handleReset}>
-                Reset
-              </button>
+                </>
+              )}
               {session?.user && (
                 <>
                   <div className="menu-divider" />
@@ -705,6 +701,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0 }, onRou
               )}
             </div>
           )}
+          </div>
         </div>
       </header>
 
@@ -751,22 +748,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0 }, onRou
             </>
           );
         })()}
-        {showStats !== 'off' && (
-          <div className="table-stats">
-            {trainingMode === 'basic' ? (
-              <>
-                <div className="table-stats-row"><span>Decisions</span><span>{strategyStats.total}</span></div>
-                <div className="table-stats-row table-stats-rate"><span>Correct</span><span>{strategyStats.total > 0 ? Math.round(strategyStats.correct / strategyStats.total * 100) : 0}%</span></div>
-              </>
-            ) : (
-              <>
-                <div className="table-stats-row"><span>Hands</span><span>{stats.hands}</span></div>
-                <div className="table-stats-row table-stats-rate"><span>Win %</span><span>{stats.hands > 0 ? Math.round(stats.wins / stats.hands * 100) : 0}%</span></div>
-              </>
-            )}
-          </div>
-        )}
-        <DealerHand hand={dealerHand} gamePhase={gamePhase} />
+<DealerHand hand={dealerHand} gamePhase={gamePhase} />
         {statusMessage && <StatusBanner message={statusMessage} />}
         {isSplitActive ? (
           <div className="split-hands-row">

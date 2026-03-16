@@ -41,6 +41,11 @@ export default function GameClient() {
     }, 800)
   }, [session])
 
+  const openAuthModal = useCallback(() => {
+    setGuestMode(false)
+    setModalDismissed(false)
+  }, [])
+
   if (status === 'loading') return null
 
   const showModal = status === 'unauthenticated' && !guestMode && !modalDismissed
@@ -55,7 +60,7 @@ export default function GameClient() {
         <AuthModal onClose={() => setModalDismissed(true)} onGuest={() => setGuestMode(true)} />
       )}
       <DeckProvider key={session?.user?.id ?? 'guest'} initialBankroll={initialBankroll}>
-        <App initialStats={initialStats} onRoundEnd={handleRoundEnd} />
+        <App initialStats={initialStats} onRoundEnd={handleRoundEnd} onShowAuth={openAuthModal} />
       </DeckProvider>
     </>
   )

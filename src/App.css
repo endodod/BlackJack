@@ -13,13 +13,62 @@
 /* ── Header ──────────────────────────────────────────── */
 
 .game-header {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   padding: 1em 2em;
   background-color: #0f0f1a;
   border-bottom: 1px solid #1e1e30;
   flex-shrink: 0;
+}
+
+.game-header-left {
+  display: flex;
+  align-items: center;
+  gap: 1.5em;
+}
+
+.game-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75em;
+}
+
+.game-nav {
+  display: flex;
+  gap: 0.4em;
+}
+
+.nav-btn {
+  background: none;
+  border: 1.5px solid transparent;
+  border-radius: 100px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.85em;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  padding: 0.4em 1em;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+}
+
+.nav-btn:hover:not(:disabled) {
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.nav-btn-active {
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.5);
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.nav-btn-soon {
+  opacity: 0.45;
+  cursor: default;
 }
 
 .game-title {
@@ -37,12 +86,6 @@
   align-items: center;
 }
 
-.game-bankroll {
-  display: flex;
-  gap: 0.9em;
-  align-items: center;
-  justify-content: center;
-}
 
 .menu-container {
   display: flex;
@@ -50,42 +93,32 @@
   position: relative;
 }
 
-.burger-btn {
+.settings-btn {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  gap: 5px;
   background: none;
   border: none;
   cursor: pointer;
-  padding: 0.5em;
+  padding: 0.45em;
   border-radius: 8px;
-  transition: background 0.15s;
+  color: rgba(255, 255, 255, 0.6);
+  transition: background 0.15s, color 0.15s, transform 0.3s;
 }
 
-.burger-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.burger-btn span {
-  display: block;
+.settings-btn svg {
   width: 22px;
-  height: 2px;
-  background: rgba(255, 255, 255, 0.8);
-  border-radius: 2px;
-  transition: transform 0.2s ease, opacity 0.2s ease;
+  height: 22px;
 }
 
-.burger-btn-open span:nth-child(1) {
-  transform: translateY(7px) rotate(45deg);
+.settings-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
 }
 
-.burger-btn-open span:nth-child(2) {
-  opacity: 0;
-}
-
-.burger-btn-open span:nth-child(3) {
-  transform: translateY(-7px) rotate(-45deg);
+.settings-btn-open {
+  color: #f59e0b;
+  transform: rotate(45deg);
 }
 
 .menu-panel {
@@ -374,6 +407,37 @@
   color: #f59e0b;
   border-color: rgba(245, 158, 11, 0.45);
   background-color: rgba(245, 158, 11, 0.09);
+}
+
+.hud-user-link {
+  text-decoration: none;
+  color: inherit;
+  font-size: 1.2em;
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s, color 0.15s;
+}
+
+.hud-user-link:hover {
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.5);
+  background-color: rgba(245, 158, 11, 0.08);
+}
+
+.menu-auth-btn {
+  background: rgba(245, 158, 11, 0.1);
+  border: 1.5px solid rgba(245, 158, 11, 0.35);
+  border-radius: 10px;
+  color: #f59e0b;
+  font-size: 0.95em;
+  font-weight: 700;
+  padding: 0.6em 1em;
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.15s;
+}
+
+.menu-auth-btn:hover {
+  background: rgba(245, 158, 11, 0.18);
 }
 
 /* ── Table (green felt) ──────────────────────────────── */
@@ -713,6 +777,13 @@ kbd.key-hint {
 
   .game-header {
     padding: 0.6em 1em;
+    flex-wrap: wrap;
+    gap: 0.5em;
+  }
+
+  .nav-btn {
+    font-size: 0.75em;
+    padding: 0.35em 0.75em;
   }
 }
 
