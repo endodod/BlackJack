@@ -7,6 +7,7 @@
 ## Planned
 [ ] - Multiplayer Chat
 [ ] - Mutliplayer statistics
+[ ] - Enhanced Training statistics
 [ ] - Card counting training
 [ ] - Joining / Rejoining ongoing multiplayer lobbies
 [ ] - Singleplayer bots
