@@ -12,4 +12,5 @@
 [ ] - Joining / Rejoining ongoing multiplayer lobbies
 [ ] - Singleplayer bots
 [ ] - Multiplayer bots
+[ ] - Redesign
 [ ] - Mobile design
