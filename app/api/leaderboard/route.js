@@ -4,12 +4,13 @@ import prisma from '../../../src/lib/prisma'
 export async function GET() {
   const [income, training, resets] = await Promise.all([
     prisma.user.findMany({
+      where: { hands: { gte: 10 } },
       orderBy: { totalIncome: 'desc' },
       take: 10,
       select: { username: true, totalIncome: true, hands: true },
     }),
     prisma.user.findMany({
-      where: { trainingHands: { gt: 0 } },
+      where: { trainingHands: { gte: 10 } },
       orderBy: { trainingHands: 'desc' },
       take: 10,
       select: { username: true, trainingHands: true, trainingCorrect: true },

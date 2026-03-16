@@ -196,8 +196,11 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
 
   // Ref always points to latest dealCards — used by effects to avoid stale closures
   const dealCardsRef = useRef(null);
+  const trainingModeRef = useRef(trainingMode);
+  const handIdRef = useRef(0);
 
   const cancelHand = useCallback(() => {
+    handIdRef.current += 1;
     gameTransitionRef.current = false;
     setPlayerHand([]);
     setDealerHand([]);
@@ -217,6 +220,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
   }, [setPlayerHand, setDealerHand, setPlayerTurn, setCurrentBet]);
 
   const dealCards = useCallback((betAmount) => {
+    const handId = ++handIdRef.current;
     resumeAudio();
     gameTransitionRef.current = false;
     setPlayerHand([]);
@@ -256,18 +260,22 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
     const c0 = workingDeck[0], c1 = workingDeck[1], c2 = workingDeck[2], c3 = workingDeck[3];
 
     setTimeout(() => {
+      if (handIdRef.current !== handId) return;
       playSound('draw');
       setPlayerHand([c0]);
     }, 650);
     setTimeout(() => {
+      if (handIdRef.current !== handId) return;
       playSound('draw');
       setDealerHand([c1]);
     }, 1300);
     setTimeout(() => {
+      if (handIdRef.current !== handId) return;
       playSound('draw');
       setPlayerHand([c0, c2]);
     }, 1950);
     setTimeout(() => {
+      if (handIdRef.current !== handId) return;
       playSound('draw');
       const finalPlayer = [c0, c2];
       const finalDealer = [c1, c3];
@@ -284,6 +292,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
         setStatusMessage('Push! Both Blackjack!');
         setGamePhase('pausing');
         setTimeout(() => {
+          if (handIdRef.current !== handId) return;
           setStatusMessage('');
           resolveRound(finalPlayer, finalDealer, betAmount);
           setGamePhase('result');
@@ -294,6 +303,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
         setPlayerTurn(false);
         setGamePhase('pausing');
         setTimeout(() => {
+          if (handIdRef.current !== handId) return;
           setStatusMessage('');
           resolveRound(finalPlayer, finalDealer, betAmount);
           setGamePhase('result');
@@ -304,6 +314,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
         setPlayerTurn(false);
         setGamePhase('pausing');
         setTimeout(() => {
+          if (handIdRef.current !== handId) return;
           setStatusMessage('');
           resolveRound(finalPlayer, finalDealer, betAmount);
           setGamePhase('result');
@@ -320,8 +331,9 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
   }, [deck, setDeck, setDealerHand, setPlayerHand, setPlayerTurn, setBankroll, resolveRound,
       trainingMode, practiceHardHands, practiceSoftHands, practicePairs, testHand]);
 
-  // Keep ref current so effects can call dealCards without stale closures
+  // Keep refs current so effects can read latest values without stale closures
   dealCardsRef.current = dealCards;
+  trainingModeRef.current = trainingMode;
 
   const handleActionValidation = useCallback((action) => {
     if (trainingMode !== 'basic' || !expectedAction) return;
@@ -388,6 +400,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
     if (playerHand.length === 0 || dealerHand.length === 0) return;
     if (gameTransitionRef.current) return;
     if (gamePhase === 'training-result') return;
+    const handId = handIdRef.current;
 
     // Player stood → transition to hand 2 (split) or go to dealer
     if (gamePhase === 'player' && !playerTurn) {
@@ -410,9 +423,11 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
           const dh = dealerHand.slice();
           const isInSplitHand2 = splitHand1Completed.length > 0;
           setTimeout(() => {
+            if (handIdRef.current !== handId) return;
             setStatusMessage('Bust!');
             playSound('bust');
             setTimeout(() => {
+              if (handIdRef.current !== handId) return;
               setStatusMessage('');
               if (isInSplitHand2) {
                 gameTransitionRef.current = false;
@@ -445,10 +460,12 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
         // Delay setPlayerTurn(false) so the bust card's flip animation (600ms)
         // finishes before the dealer hole card reveal animation starts.
         setTimeout(() => {
+          if (handIdRef.current !== handId) return;
           setPlayerTurn(false);
           setStatusMessage('Bust!');
           playSound('bust');
           setTimeout(() => {
+            if (handIdRef.current !== handId) return;
             setStatusMessage('');
             if (isSplitHand1) {
               // Hand 1 busted, transition to hand 2
@@ -481,6 +498,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
           const dh = dealerHand.slice();
           setStatusMessage('Blackjack!');
           setTimeout(() => {
+            if (handIdRef.current !== handId) return;
             setStatusMessage('');
             resolveRound(ph, dh);
             setGamePhase('result');
@@ -488,7 +506,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
         } else {
           // Hit/split to 21: delay auto-stand so the card flip animation (600ms)
           // finishes before the dealer hole card reveal animation starts.
-          setTimeout(() => setPlayerTurn(false), 650);
+          setTimeout(() => { if (handIdRef.current !== handId) return; setPlayerTurn(false); }, 650);
         }
       }
       return;
@@ -500,6 +518,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
       if (dealerTotal < 17 && deck.length > 0) {
         const { updatedHand, updatedDeck } = drawCard({ hand: dealerHand, deck });
         const timeout = setTimeout(() => {
+          if (handIdRef.current !== handId) return;
           playSound('draw');
           setDealerHand(updatedHand);
           setDeck(updatedDeck);
@@ -515,6 +534,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
         const bet1 = splitHand1Bet;
 
         setTimeout(() => {
+          if (handIdRef.current !== handId) return;
           if (ph1.length > 0) {
             // Split round: resolve both hands
             const result1 = checkWinner({ playerHand: ph1, dealerHand: dh });
@@ -545,7 +565,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
               return next;
             });
             setSplitResults({ result1, result2, amount1: bet1, amount2: bet2 });
-            setTimeout(() => setGamePhase('result'), 600);
+            setTimeout(() => { if (handIdRef.current !== handId) return; setGamePhase('result'); }, 600);
           } else {
             // Normal round
             if (dealerTotal > 21) {
@@ -565,6 +585,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
               }
             }
             setTimeout(() => {
+              if (handIdRef.current !== handId) return;
               setStatusMessage('');
               resolveRound(ph, dh);
               setGamePhase('result');
@@ -674,14 +695,21 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
   // Auto-advance from training-result: wait 1.8s then go back to betting (auto-deal fires below)
   useEffect(() => {
     if (gamePhase !== 'training-result') return;
-    const t = setTimeout(() => cancelHand(), 1800);
+    const handId = handIdRef.current;
+    const t = setTimeout(() => {
+      if (handIdRef.current !== handId) return;
+      cancelHand();
+    }, 1800);
     return () => clearTimeout(t);
   }, [gamePhase, cancelHand]);
 
   // Auto-deal next hand whenever training mode lands on betting phase
   useEffect(() => {
     if (trainingMode !== 'basic' || gamePhase !== 'betting' || trainingSetup) return;
-    const t = setTimeout(() => dealCardsRef.current?.(lastBetAmount || 10), 350);
+    const t = setTimeout(() => {
+      if (trainingModeRef.current !== 'basic') return;
+      dealCardsRef.current?.(lastBetAmount || 10);
+    }, 350);
     return () => clearTimeout(t);
   }, [trainingMode, gamePhase, lastBetAmount, trainingSetup]);
 

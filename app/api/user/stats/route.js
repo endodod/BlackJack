@@ -14,5 +14,6 @@ export async function GET() {
     select: { username: true, bankroll: true, hands: true, wins: true, losses: true, pushes: true, resets: true, totalIncome: true, blackjacks: true, trainingHands: true, trainingCorrect: true },
   })
 
+  if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
   return NextResponse.json(user)
 }

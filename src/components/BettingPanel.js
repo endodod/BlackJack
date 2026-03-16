@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react';
 import { useDeck } from '../context/DeckContext';
+import { playSound } from '../lib/sound';
 import './BettingPanel.css';
 
 const QUICK_BETS = [10, 25, 100, 500];
@@ -12,10 +13,14 @@ export default function BettingPanel({ onDeal, defaultBet = 0 }) {
   const handleQuickBet = (amount) => {
     if (betAmount + amount <= bankroll) {
       setBetAmount(prev => prev + amount);
+      playSound('chip');
     }
   };
 
-  const handleClear = () => setBetAmount(0);
+  const handleClear = () => {
+    setBetAmount(0);
+    playSound('clearbet');
+  };
 
   const handleDeal = () => {
     if (betAmount > 0 && betAmount <= bankroll) {

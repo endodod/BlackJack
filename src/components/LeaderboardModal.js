@@ -93,6 +93,14 @@ export default function LeaderboardModal({ onClose }) {
           ))}
         </div>
 
+        {(active === 'income' || active === 'training') && (
+          <p className="lb-filter-note">
+            {active === 'income'
+              ? 'Minimum 10 hands played to qualify'
+              : 'Minimum 10 training hands to qualify'}
+          </p>
+        )}
+
         <div className="lb-list">
           {loading && <div className="lb-empty">Loading…</div>}
           {!loading && rows.length === 0 && (

@@ -10,6 +10,8 @@ const SOUND_FILES = {
   win: '/sounds/win.mp3',
   bust: '/sounds/bust.mp3',
   push: '/sounds/push.mp3',
+  chip: '/sounds/chip.mp3',
+  clearbet: '/sounds/clearbet.mp3',
 };
 
 function getAudioContext() {
@@ -182,6 +184,12 @@ export function playSound(event) {
       if (!playAudioEvent('push')) {
         playTone({ frequency: 680, duration: 0.12, type: 'triangle', volume: 0.14 });
       }
+      break;
+    case 'chip':
+      playAudioEvent('chip');
+      break;
+    case 'clearbet':
+      playAudioEvent('clearbet');
       break;
     default:
       break;

@@ -9,7 +9,7 @@ export default function ProfilePage() {
   const { data: session, status } = useSession()
   const router = useRouter()
 
-  const [stats, setStats] = useState(null)
+  const [stats, setStats] = useState(undefined)
   const [usernameForm, setUsernameForm] = useState({ newUsername: '', password: '' })
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '' })
   const [deletePassword, setDeletePassword] = useState('')
@@ -21,17 +21,19 @@ export default function ProfilePage() {
   useEffect(() => {
     if (status !== 'authenticated') return
     fetch('/api/user/stats')
-      .then(r => r.json())
-      .then(setStats)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => setStats(data))
   }, [status])
 
-  if (status === 'loading' || (status === 'authenticated' && !stats)) return null
+  if (status === 'loading' || (status === 'authenticated' && stats === undefined)) return null
 
-  if (!session?.user) {
+  if (!session?.user || !stats) {
     return (
       <div className="profile-page">
         <div className="profile-container">
-          <p className="profile-not-auth">You must be signed in to view your profile.</p>
+          <p className="profile-not-auth">
+            {!session?.user ? 'You must be signed in to view your profile.' : 'Account not found. Please sign out and sign in again.'}
+          </p>
           <Link href="/" className="profile-back-btn">← Back to Game</Link>
         </div>
       </div>
@@ -142,13 +144,13 @@ export default function ProfilePage() {
               <span className="profile-stat-value">{trainingHands ?? 0}</span>
             </div>
             <div className="profile-stat">
-              <span className="profile-stat-label">Strategy Accuracy</span>
+              <span className="profile-stat-label">Training Accuracy</span>
               <span className="profile-stat-value">
                 {trainingAccuracy !== null ? `${trainingAccuracy}%` : '—'}
               </span>
             </div>
             <div className="profile-stat">
-              <span className="profile-stat-label">Resets</span>
+              <span className="profile-stat-label">Bankroll Resets</span>
               <span className="profile-stat-value">{resets ?? 0}</span>
             </div>
           </div>

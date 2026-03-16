@@ -11,6 +11,7 @@ export default function GameClient() {
   const [modalDismissed, setModalDismissed] = useState(false)
   const [volumeOn, setVolumeOn] = useState(true)
   const [userId, setUserId] = useState(session?.user?.id ?? null)
+  const [dbStats, setDbStats] = useState(undefined)
   const saveTimer = useRef(null)
   const pendingSave = useRef(null)
   const prevUserIdRef = useRef(session?.user?.id)
@@ -29,6 +30,18 @@ export default function GameClient() {
   useEffect(() => {
     setUserId(session?.user?.id ?? null)
   }, [session?.user?.id])
+
+  // Fetch fresh stats from DB on authentication to avoid stale JWT values
+  useEffect(() => {
+    if (status !== 'authenticated') {
+      setDbStats(undefined)
+      return
+    }
+    fetch('/api/user/stats')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => setDbStats(data ?? null))
+      .catch(() => setDbStats(null))
+  }, [status, session?.user?.id])
 
   // Detect logout → reset modal state
   useEffect(() => {
@@ -70,12 +83,14 @@ export default function GameClient() {
     }
   }, [])
 
+  // Wait for session and DB stats before rendering game
   if (status === 'loading') return null
+  if (status === 'authenticated' && dbStats === undefined) return null
 
   const showModal = status === 'unauthenticated' && !guestMode && !modalDismissed
-  const initialBankroll = session?.user?.bankroll ?? 1000
-  const initialStats = session?.user
-    ? { hands: session.user.hands, wins: session.user.wins, losses: session.user.losses, pushes: session.user.pushes, totalIncome: session.user.totalIncome ?? 0, blackjacks: session.user.blackjacks ?? 0, trainingHands: session.user.trainingHands ?? 0, trainingCorrect: session.user.trainingCorrect ?? 0 }
+  const initialBankroll = dbStats?.bankroll ?? 1000
+  const initialStats = dbStats
+    ? { hands: dbStats.hands, wins: dbStats.wins, losses: dbStats.losses, pushes: dbStats.pushes, totalIncome: dbStats.totalIncome ?? 0, blackjacks: dbStats.blackjacks ?? 0, trainingHands: dbStats.trainingHands ?? 0, trainingCorrect: dbStats.trainingCorrect ?? 0 }
     : { hands: 0, wins: 0, losses: 0, pushes: 0, totalIncome: 0, blackjacks: 0, trainingHands: 0, trainingCorrect: 0 }
 
   return (
