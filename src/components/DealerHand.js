@@ -1,7 +1,9 @@
 'use client'
+import { useEffect, useRef } from 'react';
 import Card from './Card';
 import { useDeck } from '../context/DeckContext';
 import getHandTotal from '../logic/getHandTotal';
+import { playSound } from '../lib/sound';
 
 export default function DealerHand({ hand, gamePhase }) {
   const { playerTurn } = useDeck();
@@ -11,6 +13,14 @@ export default function DealerHand({ hand, gamePhase }) {
     : hand;
 
   const shouldHideFirstCard = hand.length > 0 && playerTurn;
+
+  const prevHiddenRef = useRef(shouldHideFirstCard);
+  useEffect(() => {
+    if (prevHiddenRef.current && !shouldHideFirstCard && hand.length > 0) {
+      playSound('draw');
+    }
+    prevHiddenRef.current = shouldHideFirstCard;
+  }, [shouldHideFirstCard, hand.length]);
 
   // Show total only when dealer's hand is fully revealed
   const showTotal = hand.length > 0 && !playerTurn && gamePhase !== 'dealing';

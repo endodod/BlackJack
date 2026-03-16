@@ -27,3 +27,5 @@ yarn-error.log*
 
 install.cmd
 .claude
+.vercel
+.env*.local

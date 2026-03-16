@@ -9,9 +9,26 @@ export default function GameClient() {
   const { data: session, status } = useSession()
   const [guestMode, setGuestMode] = useState(false)
   const [modalDismissed, setModalDismissed] = useState(false)
+  const [volumeOn, setVolumeOn] = useState(true)
+  const [userId, setUserId] = useState(session?.user?.id ?? null)
   const saveTimer = useRef(null)
   const pendingSave = useRef(null)
   const prevUserIdRef = useRef(session?.user?.id)
+
+  // Load initial volume
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('volume')
+      if (stored !== null) {
+        setVolumeOn(stored === 'true')
+      }
+    }
+  }, [])
+
+  // Update userId for stable key
+  useEffect(() => {
+    setUserId(session?.user?.id ?? null)
+  }, [session?.user?.id])
 
   // Detect logout → reset modal state
   useEffect(() => {
@@ -46,6 +63,13 @@ export default function GameClient() {
     setModalDismissed(false)
   }, [])
 
+  const handleVolumeChange = useCallback((newVolume) => {
+    setVolumeOn(newVolume)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('volume', newVolume.toString())
+    }
+  }, [])
+
   if (status === 'loading') return null
 
   const showModal = status === 'unauthenticated' && !guestMode && !modalDismissed
@@ -59,8 +83,8 @@ export default function GameClient() {
       {showModal && (
         <AuthModal onClose={() => setModalDismissed(true)} onGuest={() => setGuestMode(true)} />
       )}
-      <DeckProvider key={session?.user?.id ?? 'guest'} initialBankroll={initialBankroll}>
-        <App initialStats={initialStats} onRoundEnd={handleRoundEnd} onShowAuth={openAuthModal} />
+      <DeckProvider key={userId ?? 'guest'} initialBankroll={initialBankroll}>
+        <App initialStats={initialStats} onRoundEnd={handleRoundEnd} onShowAuth={openAuthModal} volumeOn={volumeOn} onVolumeChange={handleVolumeChange} />
       </DeckProvider>
     </>
   )

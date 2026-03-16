@@ -2,6 +2,7 @@
 import React, { useEffect, useCallback, useState, useRef } from "react";
 import { useSession, signOut } from 'next-auth/react';
 import { DeckContext } from "./context/DeckContext";
+import { playSound, setVolumeEnabled, resumeAudio } from "./lib/sound";
 import PlayerHand from './components/PlayerHand';
 import DealerHand from './components/DealerHand';
 import PlayerActions from "./components/PlayerActions";
@@ -57,7 +58,7 @@ function findValidArrangement(deck, enabledTypes) {
   return deck;
 }
 
-function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0 }, onRoundEnd, onShowAuth }) {
+function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0 }, onRoundEnd, onShowAuth, volumeOn, onVolumeChange }) {
   const { data: session } = useSession();
   const {
     deck, setDeck,
@@ -77,12 +78,14 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0 }, onRou
 
   // Menu & settings state
   const [menuOpen, setMenuOpen] = useState(false);
-  const [volumeOn, setVolumeOn] = useState(true);
   const [trainingMode, setTrainingMode] = useState('off');
   const [stats, setStats] = useState(initialStats);
   const menuRef = useRef(null);
   const bankrollRef = useRef(bankroll);
   useEffect(() => { bankrollRef.current = bankroll; }, [bankroll]);
+
+  // Sync volume state with the sound engine.
+  useEffect(() => { setVolumeEnabled(volumeOn); }, [volumeOn]);
 
   // Training practice state
   const [trainingSetup, setTrainingSetup] = useState(false);
@@ -199,6 +202,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0 }, onRou
   }, [setPlayerHand, setDealerHand, setPlayerTurn, setCurrentBet]);
 
   const dealCards = useCallback((betAmount) => {
+    resumeAudio();
     gameTransitionRef.current = false;
     setPlayerHand([]);
     setDealerHand([]);
@@ -212,6 +216,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0 }, onRou
     // Reshuffle between hands if fewer than 25% of shoe remains
     let workingDeck = deck;
     if (trainingMode !== 'basic' && deck.length < RESHUFFLE_THRESHOLD) {
+      playSound('shuffle');
       const newDeck = [];
       for (let i = 0; i < 4; i++)
         for (const suit of suits)
@@ -235,10 +240,20 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0 }, onRou
 
     const c0 = workingDeck[0], c1 = workingDeck[1], c2 = workingDeck[2], c3 = workingDeck[3];
 
-    setTimeout(() => setPlayerHand([c0]), 650);
-    setTimeout(() => setDealerHand([c1]), 1300);
-    setTimeout(() => setPlayerHand([c0, c2]), 1950);
     setTimeout(() => {
+      playSound('draw');
+      setPlayerHand([c0]);
+    }, 650);
+    setTimeout(() => {
+      playSound('draw');
+      setDealerHand([c1]);
+    }, 1300);
+    setTimeout(() => {
+      playSound('draw');
+      setPlayerHand([c0, c2]);
+    }, 1950);
+    setTimeout(() => {
+      playSound('draw');
       const finalPlayer = [c0, c2];
       const finalDealer = [c1, c3];
       setDealerHand(finalDealer);
@@ -260,6 +275,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0 }, onRou
         }, 1500);
       } else if (dealerTotal === 21) {
         setStatusMessage('Dealer Blackjack!');
+        playSound('bust');
         setPlayerTurn(false);
         setGamePhase('pausing');
         setTimeout(() => {
@@ -269,6 +285,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0 }, onRou
         }, 1500);
       } else if (playerTotal === 21) {
         setStatusMessage('Blackjack!');
+        playSound('win');
         setPlayerTurn(false);
         setGamePhase('pausing');
         setTimeout(() => {
@@ -306,6 +323,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0 }, onRou
     setBankroll(prev => prev - currentBet);
     setCurrentBet(prev => prev * 2);
     const { updatedHand, updatedDeck } = drawCard({ hand: playerHand, deck });
+    playSound('draw');
     setTimeout(() => {
       setPlayerHand(updatedHand);
       setDeck(updatedDeck);
@@ -367,6 +385,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0 }, onRou
           const isInSplitHand2 = splitHand1Completed.length > 0;
           setTimeout(() => {
             setStatusMessage('Bust!');
+            playSound('bust');
             setTimeout(() => {
               setStatusMessage('');
               if (isInSplitHand2) {
@@ -402,6 +421,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0 }, onRou
         setTimeout(() => {
           setPlayerTurn(false);
           setStatusMessage('Bust!');
+          playSound('bust');
           setTimeout(() => {
             setStatusMessage('');
             if (isSplitHand1) {
@@ -454,6 +474,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0 }, onRou
       if (dealerTotal < 17 && deck.length > 0) {
         const { updatedHand, updatedDeck } = drawCard({ hand: dealerHand, deck });
         const timeout = setTimeout(() => {
+          playSound('draw');
           setDealerHand(updatedHand);
           setDeck(updatedDeck);
         }, 1000);
@@ -495,11 +516,19 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0 }, onRou
             // Normal round
             if (dealerTotal > 21) {
               setStatusMessage('Dealer Busts!');
+              playSound('win');
             } else {
               const result = checkWinner({ playerHand: ph, dealerHand: dh });
-              if (result === 'Player Wins') setStatusMessage('You Win!');
-              else if (result === 'House Wins') setStatusMessage('Dealer Wins!');
-              else setStatusMessage('Push!');
+              if (result === 'Player Wins') {
+                setStatusMessage('You Win!');
+                playSound('win');
+              } else if (result === 'House Wins') {
+                setStatusMessage('Dealer Wins!');
+                playSound('bust');
+              } else {
+                setStatusMessage('Push!');
+                playSound('push');
+              }
             }
             setTimeout(() => {
               setStatusMessage('');
@@ -550,6 +579,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0 }, onRou
         case 'w':
           if (deck.length > 0) {
             handleActionValidation('hit');
+            playSound('draw');
             if (trainingMode !== 'basic') {
               const { updatedHand, updatedDeck } = drawCard({ hand: playerHand, deck });
               setTimeout(() => {
@@ -674,7 +704,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0 }, onRou
                 <span className="menu-label">Volume</span>
                 <button
                   className={`menu-toggle${volumeOn ? ' menu-toggle-on' : ''}`}
-                  onClick={() => setVolumeOn(v => !v)}
+                  onClick={() => onVolumeChange(!volumeOn)}
                 >
                   {volumeOn ? 'On' : 'Off'}
                 </button>

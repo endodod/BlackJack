@@ -1,3 +1,9 @@
 {
-    "prisma.pinToPrisma6": true
+    "prisma.pinToPrisma6": true,
+    "chat.tools.terminal.autoApprove": {
+        "/^cd C:/Users/anmel/GithubRepos/blackjack && node -e \"require\\('next-auth/react'\\); console\\.log\\('next-auth/react resolved'\\)\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
 }
