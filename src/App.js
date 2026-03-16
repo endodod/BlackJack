@@ -59,7 +59,7 @@ function findValidArrangement(deck, enabledTypes) {
   return deck;
 }
 
-function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIncome: 0, blackjacks: 0, trainingHands: 0, trainingCorrect: 0 }, onRoundEnd, onShowAuth, volumeOn, onVolumeChange }) {
+function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIncome: 0, blackjacks: 0, trainingHands: 0, trainingCorrect: 0 }, onRoundEnd, onShowAuth, volumeOn, onVolumeChange, onSwitchToMultiplayer }) {
   const { data: session } = useSession();
   const {
     deck, setDeck,
@@ -724,23 +724,30 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
           <nav className="game-nav">
             {[
               ['off',   'Singleplayer', false],
-              ['multi', 'Multiplayer',  true],
               ['basic', 'Training',     false],
-            ].map(([val, label, soon]) => (
+            ].map(([val, label]) => (
               <button
                 key={val}
-                className={`nav-btn${trainingMode === val ? ' nav-btn-active' : ''}${soon ? ' nav-btn-soon' : ''}`}
-                disabled={soon}
+                className={`nav-btn${trainingMode === val ? ' nav-btn-active' : ''}`}
                 onClick={() => {
-                  if (soon || val === trainingMode) return;
+                  if (val === trainingMode) return;
                   if (gamePhase !== 'betting') cancelHand();
                   setTrainingMode(val);
                   if (val === 'basic') setTrainingSetup(true);
                 }}
               >
-                {label}{soon && <span className="soon-badge">Soon</span>}
+                {label}
               </button>
             ))}
+            <button
+              className="nav-btn"
+              onClick={() => {
+                if (gamePhase !== 'betting') cancelHand();
+                onSwitchToMultiplayer?.();
+              }}
+            >
+              Multiplayer
+            </button>
           </nav>
           <button
             className="nav-btn nav-btn-highlight"

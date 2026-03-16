@@ -4,9 +4,11 @@ import { useSession } from 'next-auth/react'
 import { DeckProvider } from './context/DeckContext'
 import App from './App'
 import AuthModal from './components/AuthModal'
+import MultiplayerClient from './multiplayer/MultiplayerClient'
 
 export default function GameClient() {
   const { data: session, status } = useSession()
+  const [mode, setMode] = useState('singleplayer') // 'singleplayer' | 'multiplayer'
   const [guestMode, setGuestMode] = useState(false)
   const [modalDismissed, setModalDismissed] = useState(false)
   const [volumeOn, setVolumeOn] = useState(true)
@@ -83,7 +85,17 @@ export default function GameClient() {
     }
   }, [])
 
-  // Wait for session and DB stats before rendering game
+  // Multiplayer mode — completely isolated from singleplayer state
+  if (mode === 'multiplayer') {
+    return (
+      <MultiplayerClient
+        onLeave={() => setMode('singleplayer')}
+        volumeOn={volumeOn}
+      />
+    )
+  }
+
+  // Wait for session and DB stats before rendering singleplayer game
   if (status === 'loading') return null
   if (status === 'authenticated' && dbStats === undefined) return null
 
@@ -99,7 +111,14 @@ export default function GameClient() {
         <AuthModal onClose={() => setModalDismissed(true)} onGuest={() => setGuestMode(true)} />
       )}
       <DeckProvider key={userId ?? 'guest'} initialBankroll={initialBankroll}>
-        <App initialStats={initialStats} onRoundEnd={handleRoundEnd} onShowAuth={openAuthModal} volumeOn={volumeOn} onVolumeChange={handleVolumeChange} />
+        <App
+          initialStats={initialStats}
+          onRoundEnd={handleRoundEnd}
+          onShowAuth={openAuthModal}
+          volumeOn={volumeOn}
+          onVolumeChange={handleVolumeChange}
+          onSwitchToMultiplayer={() => setMode('multiplayer')}
+        />
       </DeckProvider>
     </>
   )
