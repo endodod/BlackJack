@@ -1,5 +1,6 @@
 'use client'
 import React, { useEffect, useCallback, useState, useRef } from "react";
+import { useSession, signOut } from 'next-auth/react';
 import { DeckContext } from "./context/DeckContext";
 import PlayerHand from './components/PlayerHand';
 import DealerHand from './components/DealerHand';
@@ -55,7 +56,8 @@ function findValidArrangement(deck, enabledTypes) {
   return deck;
 }
 
-function App() {
+function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0 }, onRoundEnd }) {
+  const { data: session } = useSession();
   const {
     deck, setDeck,
     dealerHand, setDealerHand,
@@ -77,8 +79,10 @@ function App() {
   const [volumeOn, setVolumeOn] = useState(true);
   const [trainingMode, setTrainingMode] = useState('off');
   const [showStats, setShowStats] = useState('off');
-  const [stats, setStats] = useState({ hands: 0, wins: 0, losses: 0, pushes: 0 });
+  const [stats, setStats] = useState(initialStats);
   const menuRef = useRef(null);
+  const bankrollRef = useRef(bankroll);
+  useEffect(() => { bankrollRef.current = bankroll; }, [bankroll]);
 
   // Training practice state
   const [practiceHardHands, setPracticeHardHands] = useState(true);
@@ -138,30 +142,38 @@ function App() {
     setWinner(result);
     const amount = betAmount != null ? betAmount : currentBet;
     const isNaturalBlackjack = result === 'Player Wins' && playerH.length === 2 && getHandTotal(playerH) === 21;
+    let delta = 0;
     if (trainingMode !== 'basic') {
       if (isNaturalBlackjack) {
         // Natural blackjack pays 3:2
-        setBankroll(prev => prev + Math.floor(amount * 2.5));
+        delta = Math.floor(amount * 2.5);
+        setBankroll(prev => prev + delta);
         setResultAmount(Math.floor(amount * 1.5));
       } else if (result === 'Player Wins') {
-        setBankroll(prev => prev + amount * 2);
+        delta = amount * 2;
+        setBankroll(prev => prev + delta);
         setResultAmount(amount);
       } else if (result === 'House Wins') {
         setResultAmount(amount);
       } else {
-        setBankroll(prev => prev + amount);
+        delta = amount;
+        setBankroll(prev => prev + delta);
         setResultAmount(0);
       }
     }
     setResultMessage(isNaturalBlackjack ? 'Blackjack!' : result);
-    setStats(prev => ({
-      hands: prev.hands + 1,
-      wins: prev.wins + (result === 'Player Wins' ? 1 : 0),
-      losses: prev.losses + (result === 'House Wins' ? 1 : 0),
-      pushes: prev.pushes + (result === 'Push' ? 1 : 0),
-    }));
+    setStats(prev => {
+      const next = {
+        hands: prev.hands + 1,
+        wins: prev.wins + (result === 'Player Wins' ? 1 : 0),
+        losses: prev.losses + (result === 'House Wins' ? 1 : 0),
+        pushes: prev.pushes + (result === 'Push' ? 1 : 0),
+      };
+      onRoundEnd?.({ bankroll: bankrollRef.current + delta, stats: next });
+      return next;
+    });
     return result;
-  }, [currentBet, setBankroll, trainingMode]);
+  }, [currentBet, setBankroll, trainingMode, onRoundEnd]);
 
   // Ref always points to latest dealCards — used by effects to avoid stale closures
   const dealCardsRef = useRef(null);
@@ -459,18 +471,23 @@ function App() {
             // Split round: resolve both hands
             const result1 = checkWinner({ playerHand: ph1, dealerHand: dh });
             const result2 = checkWinner({ playerHand: ph, dealerHand: dh });
+            let splitDelta = 0;
             if (trainingMode !== 'basic') {
-              if (result1 === 'Player Wins') setBankroll(prev => prev + bet1 * 2);
-              else if (result1 === 'Push') setBankroll(prev => prev + bet1);
-              if (result2 === 'Player Wins') setBankroll(prev => prev + bet2 * 2);
-              else if (result2 === 'Push') setBankroll(prev => prev + bet2);
+              if (result1 === 'Player Wins') { setBankroll(prev => prev + bet1 * 2); splitDelta += bet1 * 2; }
+              else if (result1 === 'Push') { setBankroll(prev => prev + bet1); splitDelta += bet1; }
+              if (result2 === 'Player Wins') { setBankroll(prev => prev + bet2 * 2); splitDelta += bet2 * 2; }
+              else if (result2 === 'Push') { setBankroll(prev => prev + bet2); splitDelta += bet2; }
             }
-            setStats(prev => ({
-              hands: prev.hands + 2,
-              wins: prev.wins + (result1 === 'Player Wins' ? 1 : 0) + (result2 === 'Player Wins' ? 1 : 0),
-              losses: prev.losses + (result1 === 'House Wins' ? 1 : 0) + (result2 === 'House Wins' ? 1 : 0),
-              pushes: prev.pushes + (result1 === 'Push' ? 1 : 0) + (result2 === 'Push' ? 1 : 0),
-            }));
+            setStats(prev => {
+              const next = {
+                hands: prev.hands + 2,
+                wins: prev.wins + (result1 === 'Player Wins' ? 1 : 0) + (result2 === 'Player Wins' ? 1 : 0),
+                losses: prev.losses + (result1 === 'House Wins' ? 1 : 0) + (result2 === 'House Wins' ? 1 : 0),
+                pushes: prev.pushes + (result1 === 'Push' ? 1 : 0) + (result2 === 'Push' ? 1 : 0),
+              };
+              onRoundEnd?.({ bankroll: bankrollRef.current + splitDelta, stats: next });
+              return next;
+            });
             setSplitResults({ result1, result2, amount1: bet1, amount2: bet2 });
             setTimeout(() => setGamePhase('result'), 600);
           } else {
@@ -494,7 +511,7 @@ function App() {
     }
   }, [gamePhase, playerTurn, playerHand, dealerHand, deck, resolveRound,
       setDealerHand, setDeck, setPlayerTurn, setCurrentBet, setBankroll,
-      splitHand2, splitHand1Completed, splitBet, splitHand1Bet, currentBet, trainingMode]);
+      splitHand2, splitHand1Completed, splitBet, splitHand1Bet, currentBet, trainingMode, onRoundEnd]);
 
   const handleResultsClose = useCallback(() => {
     gameTransitionRef.current = false;
@@ -616,6 +633,7 @@ function App() {
           </div>
         ) : (
           <div className="game-bankroll">
+            {session?.user?.username && <span className="hud-item hud-user">{session.user.username}</span>}
             <span className="hud-item">Bankroll: ${bankroll}</span>
             {currentBet > 0 && <span className="hud-item hud-bet">Bet: ${isSplitActive ? (splitHand1Completed.length > 0 ? splitHand1Bet : splitBet) + currentBet : currentBet}</span>}
           </div>
@@ -674,6 +692,17 @@ function App() {
               <button className="menu-reset-btn" onClick={handleReset}>
                 Reset
               </button>
+              {session?.user && (
+                <>
+                  <div className="menu-divider" />
+                  <button
+                    className="menu-logout-btn"
+                    onClick={() => { setMenuOpen(false); signOut(); }}
+                  >
+                    Sign Out
+                  </button>
+                </>
+              )}
             </div>
           )}
         </div>

@@ -3,12 +3,12 @@ import { createContext, useContext, useState } from "react";
 
 const DeckContext = createContext();
 
-export function DeckProvider({ children }) {
+export function DeckProvider({ children, initialBankroll = 1000 }) {
   const [deck, setDeck] = useState([]);
   const [dealerHand, setDealerHand] = useState([]);
   const [playerHand, setPlayerHand] = useState([]);
   const [playerTurn, setPlayerTurn] = useState(true);
-  const [bankroll, setBankroll] = useState(1000);
+  const [bankroll, setBankroll] = useState(initialBankroll);
   const [currentBet, setCurrentBet] = useState(0);
 
   return (

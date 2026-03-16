@@ -3,6 +3,7 @@ import '../src/App.css'
 import '../src/components/BettingPanel.css'
 import '../src/components/ResultPanel.css'
 import ScaleInit from '../src/components/ScaleInit'
+import Providers from '../src/components/Providers'
 
 export const metadata = {
   title: 'Blackjack',
@@ -37,7 +38,7 @@ export default function RootLayout({ children }) {
       </head>
       <body className="app-body">
         <ScaleInit />
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   )
