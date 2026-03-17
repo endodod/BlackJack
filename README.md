@@ -1,80 +1,52 @@
-# BlackJack
+# Blackjack
 
-A browser-based Blackjack card game with user accounts, a leaderboard, and a basic strategy trainer.
+A multiplayer blackjack game built with Next.js, Prisma, NextAuth, and PartyKit.
 
-🌐 **Live:** [blackjack.paulkuehn.ch](https://blackjack.paulkuehn.ch)
+## Running Locally
 
----
+### Prerequisites
 
-## Stack
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
 
-| | |
-|---|---|
-| **Framework** | Next.js 15 (App Router) |
-| **UI** | React 19 |
-| **Auth** | NextAuth.js v4 |
-| **ORM** | Prisma 5 |
-| **Database** | PostgreSQL |
-| **Password hashing** | bcryptjs |
-| **Styling** | Plain CSS |
-| **Hosting** | Vercel |
+2. Create a `.env.local` file in the project root with the following variables:
+   ```env
+   DATABASE_URL="your-postgres-connection-string"
+   NEXTAUTH_SECRET="your-nextauth-secret"
+   NEXTAUTH_URL="http://localhost:3000"
+   ```
 
----
+3. Generate the Prisma client:
+   ```bash
+   npx prisma generate
+   ```
 
-## Features
+### Start the App
 
-- Full Blackjack gameplay — bet, hit, stand, double down, split (incl. double after split)
-- Animated card dealing with a 4-deck shoe (reshuffles at <25% remaining)
-- Keyboard shortcuts — `W` Hit · `S` Stand · `D` Double · `A` Split
-- User accounts — register, login, change username/password, delete account
-- Persistent bankroll & stats (hands, wins, losses, pushes, blackjacks, income)
-- Global leaderboard
-- Basic strategy trainer with real-time feedback
-- Strategy reference table modal
-- Sound effects (chip, draw, win, bust, clear bet)
-- Cross-monitor scaling fix via `ScaleInit.js`
+You need **two terminals running simultaneously**:
 
----
-
-## Rules
-
-- Dealer stands on soft 17
-- No surrender
-- No re-split after split
-
----
-
-## Getting Started
-
+**Terminal 1 — Next.js app**
 ```bash
-git clone https://github.com/endodod/BlackJack.git
-cd BlackJack
-npm install
-```
-
-Set up your environment variables:
-
-```env
-DATABASE_URL=postgresql://...
-NEXTAUTH_SECRET=...
-NEXTAUTH_URL=http://localhost:3000
-```
-
-Then run:
-
-```bash
-npx prisma generate
-npx prisma db push
 npm run dev
 ```
+Available at `http://localhost:3000`
 
-Open [http://localhost:3000](http://localhost:3000).
+**Terminal 2 — PartyKit multiplayer server**
+```bash
+npm run party:dev
+```
+Available at `http://127.0.0.1:1999`
 
----
+The Next.js app connects to the PartyKit server for real-time multiplayer functionality. Both must be running for multiplayer to work.
 
-## Planned
+## Scripts
 
-- Fix Ace logic edge case (2×A)
-- Pro mode — card counting training
-- Mobile support
-- Multiplayer (?)
+| Command | Description |
+|---|---|
+| `npm run dev` | Start Next.js dev server |
+| `npm run build` | Build for production |
+| `npm run start` | Start production server |
+| `npm run party:dev` | Start PartyKit server locally |
+| `npm run party:deploy` | Deploy PartyKit server |
