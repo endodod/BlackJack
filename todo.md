@@ -8,6 +8,7 @@
 [ ] - Joining / Rejoining ongoing multiplayer lobbies
 [ ] - Link Singleplayer Accounts to Multiplayer
 [ ] - Mutliplayer statistics
+[ ] - Sound Volume Control / Verify Soundssystem (Stand, Double, Split)
 [ ] - Multiplayer Chat
 [ ] - Enhanced Training statistics
 [ ] - Card counting training

@@ -61,6 +61,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
     onReset,
     onMenuClose: useCallback(() => setMenuOpen(false), []),
     trainingMode,
+    trainingSetup,
     practiceHardHands,
     practiceSoftHands,
     practicePairs,

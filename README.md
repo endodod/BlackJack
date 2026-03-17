@@ -72,6 +72,32 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ---
 
+## Tests
+
+```bash
+npm test
+```
+
+224 tests across 13 suites covering:
+
+| Suite | What it covers |
+|---|---|
+| `logic/getHandTotal` | Ace soft/hard switching, face cards, bust totals |
+| `logic/checkWinner` | Dealer bust, player bust, higher hand wins, push |
+| `logic/drawCard` | Card added to hand, removed from deck, immutability |
+| `api/register` | Username/password validation, duplicate check, hashing, SQL injection/XSS edge cases |
+| `api/login` | Correct credentials, wrong password, missing fields, case sensitivity, JWT strategy |
+| `api/changePassword` | Auth guard, current password check, new password validation |
+| `api/changeUsername` | Auth guard, duplicate check, password verification, whitespace edge case |
+| `api/deleteAccount` | Auth guard, password confirmation, Prisma delete called |
+| `api/resetStats` | Auth guard, bankroll reset to 1000, all stats zeroed, resets counter incremented |
+| `components/BettingPanel` | Chip buttons, bet accumulation, Deal/Clear enable state, balance guards |
+| `components/AuthModal` | Login/register flows, error messages, guest mode, HTML required validation |
+| `components/ProfilePage` | Reset game, change username/password, delete account (two-step UI), stats display |
+| `hooks/useBlackjackGame` | Deal, hit, stand, double down, split, natural blackjack payout, edge cases |
+
+---
+
 ## Planned
 
 - Fix Ace logic edge case (2×A)

@@ -55,6 +55,7 @@ export function useBlackjackGame({
   onReset,
   onMenuClose,
   trainingMode,
+  trainingSetup = false,
   practiceHardHands,
   practiceSoftHands,
   practicePairs,
@@ -612,13 +613,13 @@ export function useBlackjackGame({
   // ── Auto-deal next hand in training mode ─────────────────────────────────────
 
   useEffect(() => {
-    if (trainingMode !== 'basic' || gamePhase !== 'betting') return;
+    if (trainingMode !== 'basic' || gamePhase !== 'betting' || trainingSetup) return;
     const t = setTimeout(() => {
       if (trainingModeRef.current !== 'basic') return;
       dealCardsRef.current?.(lastBetAmount || 10);
     }, 350);
     return () => clearTimeout(t);
-  }, [trainingMode, gamePhase, lastBetAmount]);
+  }, [trainingMode, gamePhase, lastBetAmount, trainingSetup]);
 
   // ── Derived values ───────────────────────────────────────────────────────────
 
