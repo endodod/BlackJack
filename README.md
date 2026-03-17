@@ -1,4 +1,4 @@
-# BlackJack
+# Blackjack
 
 A browser-based Blackjack card game with user accounts, a leaderboard, and a basic strategy trainer.
 
@@ -52,19 +52,24 @@ cd BlackJack
 npm install
 ```
 
-Set up your environment variables:
+2. Create a `.env.local` file in the project root with the following variables:
+   ```env
+   DATABASE_URL="your-postgres-connection-string"
+   NEXTAUTH_SECRET="your-nextauth-secret"
+   NEXTAUTH_URL="http://localhost:3000"
+   ```
 
-```env
-DATABASE_URL=postgresql://...
-NEXTAUTH_SECRET=...
-NEXTAUTH_URL=http://localhost:3000
-```
+3. Generate the Prisma client:
+   ```bash
+   npx prisma generate
+   ```
 
-Then run:
+### Start the App
 
+You need **two terminals running simultaneously**:
+
+**Terminal 1 — Next.js app**
 ```bash
-npx prisma generate
-npx prisma db push
 npm run dev
 ```
 
