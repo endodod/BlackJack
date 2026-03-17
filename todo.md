@@ -1,17 +1,16 @@
 # Blackjack — TODO
 
-## On Going
-
-[ ] - Multiplayer
-
 ## Planned
-[ ] - Refractor App.js
 [ ] - Tests
-[ ] - Multiplayer Chat
+[ ] - Reset below 10 dollars
+[ ] - Handle Multiplayer loosing -> quit / spectating
+[ ] - Ui redo -> watch others do their turn / outcome msg
+[ ] - Joining / Rejoining ongoing multiplayer lobbies
+[ ] - Link Singleplayer Accounts to Multiplayer
 [ ] - Mutliplayer statistics
+[ ] - Multiplayer Chat
 [ ] - Enhanced Training statistics
 [ ] - Card counting training
-[ ] - Joining / Rejoining ongoing multiplayer lobbies
 [ ] - Singleplayer bots
 [ ] - Multiplayer bots
 [ ] - Redesign
