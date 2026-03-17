@@ -40,7 +40,7 @@ export default function ProfilePage() {
     )
   }
 
-  const { username, bankroll, hands, wins, pushes, resets, totalIncome, blackjacks, trainingHands, trainingCorrect } = stats
+  const { username, bankroll, hands, wins, pushes, resets, totalIncome, blackjacks, trainingHands, trainingCorrect, multiplayerGamesPlayed } = stats
   const winRate = hands > 0 ? Math.round((wins / hands) * 100) : 0
   const trainingAccuracy = trainingHands > 0 ? Math.round((trainingCorrect / trainingHands) * 100) : null
   const incomeDisplay = (totalIncome >= 0 ? '+' : '') + '$' + totalIncome
@@ -126,7 +126,7 @@ export default function ProfilePage() {
               <span className="profile-stat-value">{winRate}%</span>
             </div>
             <div className="profile-stat">
-              <span className="profile-stat-label">Total Income</span>
+              <span className="profile-stat-label">Total Earnings</span>
               <span className={`profile-stat-value${totalIncome > 0 ? ' profile-stat-positive' : totalIncome < 0 ? ' profile-stat-negative' : ''}`}>
                 {incomeDisplay}
               </span>
@@ -140,8 +140,8 @@ export default function ProfilePage() {
               <span className="profile-stat-value">{pushes}</span>
             </div>
             <div className="profile-stat">
-              <span className="profile-stat-label">Training Hands</span>
-              <span className="profile-stat-value">{trainingHands ?? 0}</span>
+              <span className="profile-stat-label">Multiplayer Games</span>
+              <span className="profile-stat-value">{multiplayerGamesPlayed ?? 0}</span>
             </div>
             <div className="profile-stat">
               <span className="profile-stat-label">Training Accuracy</span>

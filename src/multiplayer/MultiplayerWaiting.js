@@ -5,7 +5,7 @@ export default function MultiplayerWaiting({ gameState, playerId, onStart, onLea
 
   const { code, players, hostId } = gameState;
   const isHost = hostId === playerId;
-  const canStart = isHost && players.length >= 2;
+  const canStart = isHost;
 
   return (
     <div className="mp-screen">
@@ -44,10 +44,7 @@ export default function MultiplayerWaiting({ gameState, playerId, onStart, onLea
 
         {isHost ? (
           <div className="mp-start-area">
-            {players.length < 2 && (
-              <p className="mp-start-hint">Need at least 2 players to start.</p>
-            )}
-            <button
+              <button
               className="mp-primary-btn"
               disabled={!canStart}
               onClick={onStart}

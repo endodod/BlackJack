@@ -41,9 +41,8 @@ function checkWinner(playerHand, dealerHand) {
 export default class BlackjackParty {
   constructor(room) {
     this.room = room;
-    // Lobby state — one instance per room (= one lobby per room ID)
     this.players = [];
-    this.hostId = null;
+    this.hostId = null; // stableId of current host
     this.status = 'waiting'; // waiting | betting | playing | dealer | round-end
     this.deck = createShoe();
     this.dealerHand = [];
@@ -53,7 +52,6 @@ export default class BlackjackParty {
   }
 
   onConnect(conn) {
-    // Send current state to reconnecting players or late joiners
     if (this.players.length > 0) {
       conn.send(JSON.stringify({ type: 'lobby:sync', state: this.publicState() }));
     }
@@ -71,18 +69,22 @@ export default class BlackjackParty {
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
-  makePlayer(connId, name) {
+  makePlayer(connId, name, stableId, bankroll) {
     return {
-      id: connId,
+      id: connId,          // kept as connId for now; overwritten by stableId when provided
+      stableId: stableId || connId,
+      connId,
       name: (name || 'Player').slice(0, 20),
-      bankroll: 1000,
+      bankroll: (typeof bankroll === 'number' && bankroll > 0) ? bankroll : 1000,
       bet: 0,
       hand: [],
       splitHand: null,
       hand1Completed: null,
       hand1Bet: 0,
       splitBet: 0,
-      handStatus: 'betting', // betting | waiting | acting | stood | busted | done
+      handStatus: 'betting', // betting | waiting | acting | stood | busted | done | pending | disconnected
+      pending: false,        // true = joined mid-round, waits for next round to play
+      disconnected: false,
       result: null,
       splitResult: null,
       resultAmount: 0,
@@ -97,7 +99,7 @@ export default class BlackjackParty {
       status: this.status,
       hostId: this.hostId,
       players: this.players.map(p => ({
-        id: p.id,
+        id: p.stableId,          // expose stableId as the public identity
         name: p.name,
         bankroll: p.bankroll,
         bet: p.bet,
@@ -107,6 +109,8 @@ export default class BlackjackParty {
         hand1Bet: p.hand1Bet,
         splitBet: p.splitBet,
         handStatus: p.handStatus,
+        pending: p.pending,
+        disconnected: p.disconnected,
         result: p.result,
         splitResult: p.splitResult,
         resultAmount: p.resultAmount,
@@ -132,18 +136,18 @@ export default class BlackjackParty {
     // ── Lobby create ──────────────────────────────────────────────────────────
     if (type === 'lobby:create') {
       if (this.players.length > 0) {
-        // Room already taken — code collision (very rare with 4-char codes)
         sender.send(JSON.stringify({ type: 'error', message: 'Lobby code already in use. Try again.' }));
         return;
       }
-      const player = this.makePlayer(sender.id, msg.name);
+      const stableId = msg.stableId || sender.id;
+      const player = this.makePlayer(sender.id, msg.name, stableId, msg.bankroll);
       this.players.push(player);
-      this.hostId = sender.id;
+      this.hostId = stableId;
       sender.send(JSON.stringify({
         type: 'lobby:created',
         code: this.room.id,
         state: this.publicState(),
-        playerId: sender.id,
+        playerId: stableId,
       }));
       return;
     }
@@ -154,25 +158,51 @@ export default class BlackjackParty {
         sender.send(JSON.stringify({ type: 'error', message: 'Lobby not found.' }));
         return;
       }
-      if (this.status !== 'waiting') {
-        sender.send(JSON.stringify({ type: 'error', message: 'Game has already started.' }));
-        return;
-      }
       if (this.players.length >= 5) {
         sender.send(JSON.stringify({ type: 'error', message: 'Lobby is full (5/5).' }));
         return;
       }
-      if (this.players.some(p => p.id === sender.id)) {
+      const stableId = msg.stableId || sender.id;
+      if (this.players.some(p => p.stableId === stableId)) {
         sender.send(JSON.stringify({ type: 'error', message: 'Already in lobby.' }));
         return;
       }
-      const player = this.makePlayer(sender.id, msg.name);
+      const isActivegame = this.status !== 'waiting';
+      const player = this.makePlayer(sender.id, msg.name, stableId, msg.bankroll);
+      if (isActivegame) {
+        player.pending = true;
+        player.handStatus = 'pending';
+      }
       this.players.push(player);
       sender.send(JSON.stringify({
         type: 'lobby:joined',
         code: this.room.id,
         state: this.publicState(),
-        playerId: sender.id,
+        playerId: stableId,
+      }));
+      this.broadcast({ type: 'lobby:update', state: this.publicState() });
+      return;
+    }
+
+    // ── Lobby rejoin (reload persistence) ────────────────────────────────────
+    if (type === 'lobby:rejoin') {
+      const player = this.players.find(p => p.stableId === msg.stableId);
+      if (!player) {
+        sender.send(JSON.stringify({ type: 'error', message: 'Session expired. Please rejoin.' }));
+        return;
+      }
+      player.connId = sender.id;
+      player.id = sender.id; // keep id in sync with connId for action guards
+      player.disconnected = false;
+      if (player.handStatus === 'disconnected') {
+        // Was disconnected mid-round — skip them for this round
+        player.handStatus = player.pending ? 'pending' : 'stood';
+      }
+      sender.send(JSON.stringify({
+        type: 'lobby:rejoined',
+        code: this.room.id,
+        state: this.publicState(),
+        playerId: player.stableId,
       }));
       this.broadcast({ type: 'lobby:update', state: this.publicState() });
       return;
@@ -180,12 +210,9 @@ export default class BlackjackParty {
 
     // ── Lobby start (host only) ───────────────────────────────────────────────
     if (type === 'lobby:start') {
-      if (this.hostId !== sender.id) {
+      const host = this.players.find(p => p.connId === sender.id);
+      if (!host || host.stableId !== this.hostId) {
         sender.send(JSON.stringify({ type: 'error', message: 'Only the host can start.' }));
-        return;
-      }
-      if (this.players.length < 2) {
-        sender.send(JSON.stringify({ type: 'error', message: 'Need at least 2 players to start.' }));
         return;
       }
       if (this.status !== 'waiting') return;
@@ -196,8 +223,9 @@ export default class BlackjackParty {
     }
 
     // ── All game actions require the player to be in the lobby ────────────────
-    const player = this.players.find(p => p.id === sender.id);
+    const player = this.players.find(p => p.connId === sender.id);
     if (!player) return;
+    if (player.pending || player.disconnected) return;
 
     // ── Bet ───────────────────────────────────────────────────────────────────
     if (type === 'player:bet') {
@@ -212,7 +240,8 @@ export default class BlackjackParty {
       player.bankroll -= amount;
       player.handStatus = 'waiting';
       this.broadcast({ type: 'game:state', state: this.publicState() });
-      if (this.players.every(p => p.handStatus !== 'betting')) {
+      // All non-pending, non-disconnected players must have bet
+      if (this.players.every(p => p.pending || p.disconnected || p.handStatus !== 'betting')) {
         setTimeout(() => this.dealCards(), 500);
       }
       return;
@@ -221,7 +250,7 @@ export default class BlackjackParty {
     // ── Action-phase guard: only the current player can act ───────────────────
     if (this.status !== 'playing') return;
     if (this.currentPlayerIndex < 0) return;
-    if (this.players[this.currentPlayerIndex]?.id !== sender.id) return;
+    if (this.players[this.currentPlayerIndex]?.stableId !== player.stableId) return;
     if (player.handStatus !== 'acting') return;
 
     // ── Hit ───────────────────────────────────────────────────────────────────
@@ -321,12 +350,16 @@ export default class BlackjackParty {
   advanceToNextPlayer() {
     let next = this.currentPlayerIndex + 1;
     while (next < this.players.length) {
-      const status = this.players[next].handStatus;
-      if (status !== 'stood' && status !== 'busted' && status !== 'done') break;
+      const p = this.players[next];
+      if (!p.pending && !p.disconnected) {
+        const status = p.handStatus;
+        if (status !== 'stood' && status !== 'busted' && status !== 'done') break;
+      }
       next++;
     }
     if (next >= this.players.length) {
-      const allBusted = this.players.every(p => p.handStatus === 'busted');
+      const activePlayers = this.players.filter(p => !p.pending && !p.disconnected);
+      const allBusted = activePlayers.every(p => p.handStatus === 'busted');
       if (allBusted) {
         this.resolveRound();
       } else {
@@ -365,6 +398,7 @@ export default class BlackjackParty {
     const dealerH = this.dealerHand;
 
     for (const player of this.players) {
+      if (player.pending || player.disconnected) continue;
       player.handStatus = 'done';
 
       if (player.hand1Completed && player.hand1Completed.length > 0) {
@@ -399,8 +433,9 @@ export default class BlackjackParty {
       }
     }
 
-    // Forced reset: any player at $0 gets topped back up to $1000
+    // Forced reset: any active player at $0 gets topped back up to $1000
     for (const player of this.players) {
+      if (player.pending || player.disconnected) continue;
       if (player.bankroll <= 0) {
         player.bankroll = 1000;
         player.forcedReset = true;
@@ -426,12 +461,18 @@ export default class BlackjackParty {
       p.hand1Completed = null;
       p.hand1Bet = 0;
       p.splitBet = 0;
-      p.handStatus = 'betting';
       p.result = null;
       p.splitResult = null;
       p.resultAmount = 0;
       p.splitResultAmount = 0;
       p.forcedReset = false;
+      // Pending players become active; disconnected players stay out until rejoined
+      if (p.disconnected) {
+        p.handStatus = 'disconnected';
+      } else {
+        p.pending = false;
+        p.handStatus = 'betting';
+      }
     }
     this.dealerHand = [];
     this.dealerHoleHidden = true;
@@ -443,15 +484,20 @@ export default class BlackjackParty {
 
   dealCards() {
     this.status = 'dealing';
-    const n = this.players.length;
-    // Deal right to left (highest index first), two passes
-    for (let i = n - 1; i >= 0; i--) this.players[i].hand.push(this.deck.shift());
+    // Only deal to active (non-pending, non-disconnected) players
+    for (const p of this.players) {
+      if (!p.pending && !p.disconnected) p.hand.push(this.deck.shift());
+    }
     this.dealerHand.push(this.deck.shift());
-    for (let i = n - 1; i >= 0; i--) this.players[i].hand.push(this.deck.shift());
+    for (const p of this.players) {
+      if (!p.pending && !p.disconnected) p.hand.push(this.deck.shift());
+    }
     this.dealerHand.push(this.deck.shift());
 
     const dealerTotal = getHandTotal(this.dealerHand);
-    for (const p of this.players) p.handStatus = 'waiting';
+    for (const p of this.players) {
+      if (!p.pending && !p.disconnected) p.handStatus = 'waiting';
+    }
 
     if (dealerTotal === 21) {
       // Dealer blackjack — reveal hole card and end round immediately
@@ -464,13 +510,13 @@ export default class BlackjackParty {
 
     // Auto-stand players with natural blackjack
     for (const p of this.players) {
-      if (getHandTotal(p.hand) === 21) p.handStatus = 'stood';
+      if (!p.pending && !p.disconnected && getHandTotal(p.hand) === 21) p.handStatus = 'stood';
     }
 
     this.status = 'playing';
-    const firstActive = this.players.findIndex(p => p.handStatus === 'waiting');
+    const firstActive = this.players.findIndex(p => !p.pending && !p.disconnected && p.handStatus === 'waiting');
     if (firstActive === -1) {
-      // All players have blackjack — go straight to dealer
+      // All active players have blackjack — go straight to dealer
       this.currentPlayerIndex = -1;
       this.broadcast({ type: 'game:dealt', state: this.publicState() });
       setTimeout(() => this.startDealerPhase(), 1500);
@@ -510,31 +556,38 @@ export default class BlackjackParty {
   // ── Disconnect cleanup ─────────────────────────────────────────────────────
 
   cleanupPlayer(connId) {
-    const idx = this.players.findIndex(p => p.id === connId);
-    if (idx === -1) return;
+    const player = this.players.find(p => p.connId === connId);
+    if (!player) return;
 
-    this.players.splice(idx, 1);
-    if (this.players.length === 0) return;
+    // Mark as disconnected — preserve bankroll and seat for potential rejoin
+    player.disconnected = true;
 
-    // Reassign host if host left
-    if (this.hostId === connId) this.hostId = this.players[0].id;
+    // Reassign host if needed
+    if (this.hostId === player.stableId) {
+      const next = this.players.find(p => !p.disconnected);
+      if (next) this.hostId = next.stableId;
+    }
 
-    // Adjust turn index if a player left during the action phase
+    // If this was the acting player, auto-stand and advance
     if (this.status === 'playing') {
-      if (idx < this.currentPlayerIndex) {
-        this.currentPlayerIndex--;
-      } else if (idx === this.currentPlayerIndex) {
-        this.currentPlayerIndex = idx - 1;
+      const idx = this.players.indexOf(player);
+      if (idx === this.currentPlayerIndex) {
+        player.handStatus = 'stood';
         this.broadcast({ type: 'lobby:player-left', state: this.publicState() });
-        this.advanceToNextPlayer();
+        setTimeout(() => {
+          if (this.players.length === 0) return;
+          this.advanceToNextPlayer();
+        }, 300);
         return;
       }
     }
 
-    // If we were waiting for this player's bet, check if everyone else has bet
+    // If betting: check if all remaining active players have now bet
     if (this.status === 'betting') {
-      const allBet = this.players.every(p => p.handStatus !== 'betting');
-      if (allBet) setTimeout(() => this.dealCards(), 500);
+      const hasActiveBettors = this.players.some(p => !p.pending && !p.disconnected && p.handStatus === 'betting');
+      if (!hasActiveBettors && this.players.some(p => !p.pending && !p.disconnected)) {
+        setTimeout(() => this.dealCards(), 500);
+      }
     }
 
     this.broadcast({ type: 'lobby:player-left', state: this.publicState() });

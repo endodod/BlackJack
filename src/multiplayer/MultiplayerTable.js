@@ -1,8 +1,12 @@
 'use client'
 import { useState, useEffect, useCallback, useRef } from 'react';
+import Link from 'next/link';
+import { useSession, signOut } from 'next-auth/react';
 import Card from '../components/Card';
 import getHandTotal from '../logic/getHandTotal';
 import { playSound } from '../lib/sound';
+import LeaderboardModal from '../components/LeaderboardModal';
+import AuthModal from '../components/AuthModal';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -67,6 +71,33 @@ function resultClass(result) {
     : result ? 'mp-slot-result-lose' : '';
 }
 
+function outcomeLabel(playerResult, playerHand, splitHand, dealerHand) {
+  const dealerTotal = getHandTotal(dealerHand);
+  const dealerBust = dealerTotal > 21;
+  const dealerBJ = dealerHand.length === 2 && dealerTotal === 21;
+
+  function labelFor(result, hand) {
+    if (result === 'Blackjack!') return { text: 'Blackjack!', cls: 'stat-win' };
+    if (result === 'Push')       return { text: 'Push',       cls: 'stat-push' };
+    const pt = getHandTotal(hand);
+    if (result === 'Player Wins') {
+      if (dealerBust) return { text: 'Dealer Bust', cls: 'stat-win' };
+      return { text: 'Win', cls: 'stat-win' };
+    }
+    if (result === 'House Wins') {
+      if (pt > 21)   return { text: 'Bust',             cls: 'stat-loss' };
+      if (dealerBJ)  return { text: 'Dealer Blackjack', cls: 'stat-loss' };
+      return { text: 'Loss', cls: 'stat-loss' };
+    }
+    return { text: result || '—', cls: '' };
+  }
+
+  return {
+    main:  labelFor(playerResult.main,  playerHand),
+    split: playerResult.split != null ? labelFor(playerResult.split, splitHand ?? []) : null,
+  };
+}
+
 function PlayerWindow({ player, isActive, isLocal }) {
   if (!player) return null;
   const isSplit = player.hand1Completed && player.hand1Completed.length > 0;
@@ -77,10 +108,35 @@ function PlayerWindow({ player, isActive, isLocal }) {
     isLocal ? 'mp-other-window-local' : '',
     isActive ? 'mp-other-window-active' : '',
     isDone && !isActive ? 'mp-other-window-done' : '',
+    player.disconnected ? 'mp-other-window-disconnected' : '',
+    player.pending ? 'mp-other-window-pending' : '',
   ].filter(Boolean).join(' ');
 
   const r1Label = resultLabel(player.result);
   const r2Label = resultLabel(player.splitResult);
+
+  if (player.pending) {
+    return (
+      <div className={windowClass}>
+        <div className="mp-other-window-name">
+          <span className="mp-other-window-name-text">{player.name}</span>
+          {isLocal && <span className="mp-other-window-you">you</span>}
+        </div>
+        <span className="mp-other-status-tag mp-other-status-joining">Joining…</span>
+      </div>
+    );
+  }
+
+  if (player.disconnected) {
+    return (
+      <div className={windowClass}>
+        <div className="mp-other-window-name">
+          <span className="mp-other-window-name-text">{player.name}</span>
+        </div>
+        <span className="mp-other-status-tag mp-other-status-disconnected">Away</span>
+      </div>
+    );
+  }
 
   return (
     <div className={windowClass}>
@@ -187,7 +243,6 @@ function LocalPlayerHand({ player, status }) {
         <span>{player.name}</span>
         <HandTotal hand={player.hand} />
         {hasSplitWaiting && <span style={{ fontSize: '0.75em', color: 'rgba(255,255,255,0.35)', fontStyle: 'italic' }}>+ split</span>}
-        {player.result && <span className={`mp-local-result ${resultClass}`}>{player.result}</span>}
       </div>
       <div className="cards-row">
         {player.hand.map((c, i) => <Card key={`${i}-${c.value}${c.suit}`} card={c} />)}
@@ -263,15 +318,19 @@ function ActionButtons({ player, send }) {
 
 // ── Main table component ──────────────────────────────────────────────────────
 
-export default function MultiplayerTable({ gameState, playerId, send, onLeave, volumeOn }) {
+export default function MultiplayerTable({ gameState, playerId, send, onLeave, onJoin, volumeOn, onVolumeChange }) {
+  const { data: session } = useSession();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [joinOpen, setJoinOpen] = useState(false);
+  const [joinCode, setJoinCode] = useState('');
+  const [lbOpen, setLbOpen] = useState(false);
+  const [authOpen, setAuthOpen] = useState(false);
   const menuRef = useRef(null);
 
   const { players = [], dealerHand = [], dealerHoleHidden, currentPlayerIndex, status, code, round } = gameState || {};
 
   const localPlayer = players.find(p => p.id === playerId);
   const localPlayerIndex = players.findIndex(p => p.id === playerId);
-  const otherPlayers = players.filter(p => p.id !== playerId);
 
   const isLocalPlayerTurn = status === 'playing' && currentPlayerIndex === localPlayerIndex && localPlayer?.handStatus === 'acting';
   const isLocalBetting = status === 'betting' && localPlayer?.handStatus === 'betting';
@@ -313,14 +372,24 @@ export default function MultiplayerTable({ gameState, playerId, send, onLeave, v
   return (
     <div className="game-table">
       {/* ── Header ── */}
-      <header className="game-header">
+      <header className="game-header mp-header">
         <div className="game-header-left">
-          <button className="game-title-btn" onClick={onLeave}>Blackjack</button>
-          <span className="mp-lobby-badge">Multiplayer</span>
+          <span className="game-title">Blackjack</span>
+          {code && <span className="mp-lobby-badge mp-lobby-badge-code">{code}</span>}
+          <button className="mp-nav-btn" onClick={() => { session?.user ? (setJoinCode(''), setJoinOpen(true)) : setAuthOpen(true); }}>
+            Join Lobby
+          </button>
         </div>
-        <div className="game-header-right">
+        <div className="mp-header-center">
           {localPlayer && <span className="hud-item">Bankroll: ${localPlayer.bankroll}</span>}
           {localPlayer?.bet > 0 && <span className="hud-item hud-bet">Bet: ${localPlayer.bet}</span>}
+        </div>
+        <div className="game-header-right">
+          <button className="mp-nav-btn mp-nav-btn-lg" onClick={() => setLbOpen(true)}>Leaderboard</button>
+          {session?.user?.username
+            ? <Link href="/profile" className="mp-nav-btn mp-nav-btn-user mp-nav-btn-lg">{session.user.username}</Link>
+            : <button className="mp-nav-btn mp-nav-btn-user mp-nav-btn-lg" onClick={() => setAuthOpen(true)}>Sign In</button>
+          }
           <div className="menu-container" ref={menuRef}>
             <button className={`settings-btn${menuOpen ? ' settings-btn-open' : ''}`} onClick={() => setMenuOpen(o => !o)} aria-label="Settings">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -330,78 +399,146 @@ export default function MultiplayerTable({ gameState, playerId, send, onLeave, v
             </button>
             {menuOpen && (
               <div className="menu-panel">
-                <button className="menu-logout-btn" onClick={() => { setMenuOpen(false); onLeave(); }}>Leave Game</button>
+                {onVolumeChange && (
+                  <button className="menu-item-btn" onClick={() => { onVolumeChange(!volumeOn); }}>
+                    Sound: {volumeOn ? 'On' : 'Off'}
+                  </button>
+                )}
+                <button className="menu-logout-btn" onClick={() => { setMenuOpen(false); onLeave(); }}>New Lobby</button>
+                {session?.user && (
+                  <button className="menu-logout-btn" onClick={() => signOut({ callbackUrl: '/' })}>Sign Out</button>
+                )}
               </div>
             )}
           </div>
         </div>
       </header>
 
+      {lbOpen && <LeaderboardModal onClose={() => setLbOpen(false)} />}
+      {authOpen && <AuthModal onClose={() => setAuthOpen(false)} onGuest={() => setAuthOpen(false)} />}
+
+      {/* ── Join Lobby modal ── */}
+      {joinOpen && (
+        <div className="mp-join-overlay" onClick={() => setJoinOpen(false)}>
+          <div className="mp-join-modal" onClick={e => e.stopPropagation()}>
+            <h3 className="mp-join-title">Join a Lobby</h3>
+            <input
+              className="mp-input mp-input-code"
+              type="text"
+              placeholder="Enter code"
+              maxLength={4}
+              autoFocus
+              value={joinCode}
+              onChange={e => setJoinCode(e.target.value.toUpperCase())}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && joinCode.trim().length === 4) {
+                  setJoinOpen(false);
+                  onJoin(joinCode.trim());
+                } else if (e.key === 'Escape') {
+                  setJoinOpen(false);
+                }
+              }}
+            />
+            <div className="mp-join-actions">
+              <button
+                className="mp-primary-btn"
+                disabled={joinCode.trim().length !== 4}
+                onClick={() => { setJoinOpen(false); onJoin(joinCode.trim()); }}
+              >
+                Join →
+              </button>
+              <button className="mp-back-btn mp-back-btn-sm" onClick={() => setJoinOpen(false)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="mp-rules-bar">
+        <span>Blackjack Pays 3 to 2</span>
+        <span className="table-rules-divider">·</span>
+        <span>Dealer Stands Soft 17</span>
+        <span className="table-rules-divider">·</span>
+        <span>4 Decks</span>
+        <span className="table-rules-divider">·</span>
+        <span>No Surrender</span>
+        <span className="table-rules-divider">·</span>
+        <span>No Insurance</span>
+      </div>
+
       <div className="green-board mp-board-layout">
 
-        {/* ── Left sidebar ── */}
-        <aside className="mp-sidebar-left">
+        {/* ── Left sidebar (hidden in solo) ── */}
+        {players.length > 1 && <aside className="mp-sidebar-left">
           <div className="mp-sidebar-section">
-            <span className="mp-sidebar-label">Lobby</span>
-            <div className="mp-sidebar-code">{code}</div>
-            <span className="mp-sidebar-round">Round {round}</span>
+            {code && <div className="mp-sidebar-code">{code}</div>}
+            <span className="mp-sidebar-label">Round {round}</span>
           </div>
 
-          <div className="mp-sidebar-divider" />
-
-          <div className="mp-sidebar-section mp-sidebar-leaderboard">
-            <span className="mp-sidebar-label">Leaderboard</span>
-            {[...players]
-              .sort((a, b) => b.bankroll - a.bankroll)
-              .map((p, i) => (
-                <div key={p.id} className={`mp-lb-row${p.id === playerId ? ' mp-lb-row-you' : ''}`}>
-                  <span className="mp-lb-rank">{i + 1}</span>
-                  <span className="mp-lb-name">{p.name}</span>
-                  {p.id === playerId && <span className="mp-lb-you">YOU</span>}
-                  <span className="mp-lb-bankroll">${p.bankroll}</span>
-                </div>
-              ))
-            }
-          </div>
-        </aside>
+          {players.length > 1 && (
+            <>
+              <div className="mp-sidebar-divider" />
+              <div className="mp-sidebar-section mp-sidebar-leaderboard">
+                <span className="mp-sidebar-label">Leaderboard</span>
+                {[...players]
+                  .sort((a, b) => b.bankroll - a.bankroll)
+                  .map((p, i) => (
+                    <div key={p.id} className={`mp-lb-row${p.id === playerId ? ' mp-lb-row-you' : ''}${p.disconnected ? ' mp-lb-row-disconnected' : ''}${p.pending ? ' mp-lb-row-pending' : ''}`}>
+                      <span className="mp-lb-rank">{i + 1}</span>
+                      <span className="mp-lb-name">{p.name}</span>
+                      {p.id === playerId && <span className="mp-lb-you">YOU</span>}
+                      {p.pending && <span className="mp-lb-badge">joining</span>}
+                      {p.disconnected && <span className="mp-lb-badge">away</span>}
+                      <span className="mp-lb-bankroll">${p.bankroll}</span>
+                    </div>
+                  ))
+                }
+              </div>
+            </>
+          )}
+        </aside>}
 
         {/* ── Center: table + controls ── */}
         <div className="mp-center-col">
           <div className="table-area mp-table-area">
-            <div className="table-rules">
-              <span>Blackjack Pays 3 to 2</span>
-              <span className="table-rules-divider">·</span>
-              <span>Dealer Stands Soft 17</span>
-              <span className="table-rules-divider">·</span>
-              <span>4 Decks</span>
-            </div>
 
             {/* Dealer */}
-            <MultiDealerHand hand={dealerHand} holeHidden={dealerHoleHidden} />
+            {status !== 'betting' && <MultiDealerHand hand={dealerHand} holeHidden={dealerHoleHidden} />}
+
+            {status === 'betting' && (
+              <p className="mp-bet-prompt">Place your bet</p>
+            )}
 
             {/* Local player — full-size cards, same as singleplayer */}
-            <LocalPlayerHand player={localPlayer} status={status} />
+            {status !== 'betting' && <LocalPlayerHand player={localPlayer} status={status} />}
           </div>
 
           {/* ── Controls bar ── */}
           <div className="controls-bar">
-          {isLocalBetting && (
+          {localPlayer?.pending && (
+            <div className="mp-waiting-indicator">
+              <span className="mp-turn-label">Joining next round…</span>
+            </div>
+          )}
+
+          {!localPlayer?.pending && isLocalBetting && (
             <div className="betting-controls">
               <BettingPanel bankroll={localPlayer.bankroll} onBet={handleBet} />
             </div>
           )}
 
-          {status === 'betting' && !isLocalBetting && (
+          {!localPlayer?.pending && status === 'betting' && !isLocalBetting && (
             <div className="mp-waiting-indicator">
               <span className="mp-turn-label">Waiting for others to bet…</span>
             </div>
           )}
 
-          {isLocalPlayerTurn && localPlayer && (
+          {!localPlayer?.pending && isLocalPlayerTurn && localPlayer && (
             <ActionButtons player={localPlayer} send={send} />
           )}
 
-          {status === 'playing' && !isLocalPlayerTurn && (
+          {!localPlayer?.pending && status === 'playing' && !isLocalPlayerTurn && (
             <div className="mp-waiting-indicator">
               <span className="mp-turn-label">
                 {currentPlayerIndex >= 0 && players[currentPlayerIndex]
@@ -411,31 +548,35 @@ export default function MultiplayerTable({ gameState, playerId, send, onLeave, v
             </div>
           )}
 
-          {(status === 'dealing' || status === 'dealer') && (
+          {!localPlayer?.pending && (status === 'dealing' || status === 'dealer') && (
             <div className="mp-waiting-indicator">
               <span className="waiting-dots">• • •</span>
             </div>
           )}
 
-          {status === 'round-end' && (
+          {!localPlayer?.pending && status === 'round-end' && (
             <div className="mp-round-end">
               <div className="mp-round-end-results">
-                {players.map(p => (
-                  <div key={p.id} className="mp-round-result-row">
-                    <span className="mp-round-result-name">{p.name}:</span>
-                    <span className={`mp-round-result-label ${p.result === 'Player Wins' || p.result === 'Blackjack!' ? 'stat-win' : p.result === 'Push' ? 'stat-push' : 'stat-loss'}`}>
-                      {p.result || '—'}
-                    </span>
-                    {p.splitResult && (
-                      <>
-                        <span className="mp-round-result-name"> / </span>
-                        <span className={`mp-round-result-label ${p.splitResult === 'Player Wins' ? 'stat-win' : p.splitResult === 'Push' ? 'stat-push' : 'stat-loss'}`}>
-                          {p.splitResult}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                ))}
+                {players.filter(p => !p.pending && !p.disconnected).map(p => {
+                  const outcome = outcomeLabel(
+                    { main: p.result, split: p.splitResult ?? null },
+                    p.hand1Completed?.length > 0 ? p.hand1Completed : p.hand,
+                    p.hand1Completed?.length > 0 ? p.hand : null,
+                    dealerHand,
+                  );
+                  return (
+                    <div key={p.id} className="mp-round-result-row">
+                      <span className="mp-round-result-name">{p.name}:</span>
+                      <span className={`mp-round-result-label ${outcome.main.cls}`}>{outcome.main.text}</span>
+                      {outcome.split && (
+                        <>
+                          <span className="mp-round-result-name"> / </span>
+                          <span className={`mp-round-result-label ${outcome.split.cls}`}>{outcome.split.text}</span>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
               <p className="mp-next-round-hint">Next round starting automatically…</p>
             </div>
@@ -443,17 +584,19 @@ export default function MultiplayerTable({ gameState, playerId, send, onLeave, v
           </div>{/* controls-bar */}
         </div>{/* mp-center-col */}
 
-        {/* ── Right sidebar: all players stacked vertically ── */}
-        <aside className="mp-sidebar-right">
-          {players.map((p, i) => (
-            <PlayerWindow
-              key={p.id}
-              player={p}
-              isLocal={p.id === playerId}
-              isActive={status === 'playing' && currentPlayerIndex === i}
-            />
-          ))}
-        </aside>
+        {/* ── Right sidebar: other players (hidden when solo) ── */}
+        {players.length > 1 && (
+          <aside className="mp-sidebar-right">
+            {players.map((p, i) => (
+              <PlayerWindow
+                key={p.id}
+                player={p}
+                isLocal={p.id === playerId}
+                isActive={status === 'playing' && currentPlayerIndex === i}
+              />
+            ))}
+          </aside>
+        )}
 
       </div>{/* green-board */}
     </div>

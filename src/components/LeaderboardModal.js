@@ -3,9 +3,9 @@ import { useEffect, useState } from 'react'
 import './LeaderboardModal.css'
 
 const BOARDS = [
-  { key: 'income',   label: 'Income' },
-  { key: 'training', label: 'Training' },
-  { key: 'resets',   label: 'Resets' },
+  { key: 'earnings',  label: 'Earnings' },
+  { key: 'training',  label: 'Training' },
+  { key: 'resets',    label: 'Resets' },
 ]
 
 function rankClass(i) {
@@ -29,20 +29,6 @@ function IncomeRow({ entry, i }) {
   )
 }
 
-function TrainingRow({ entry, i }) {
-  const accuracy = entry.trainingHands > 0
-    ? Math.round((entry.trainingCorrect / entry.trainingHands) * 100)
-    : 0
-  return (
-    <div className="lb-row">
-      <span className={rankClass(i)}>{i + 1}</span>
-      <span className="lb-name">{entry.username}</span>
-      <span className="lb-primary">{entry.trainingHands} hands</span>
-      <span className="lb-secondary">{accuracy}% correct</span>
-    </div>
-  )
-}
-
 function ResetsRow({ entry, i }) {
   return (
     <div className="lb-row">
@@ -54,7 +40,7 @@ function ResetsRow({ entry, i }) {
 }
 
 export default function LeaderboardModal({ onClose }) {
-  const [active, setActive] = useState('income')
+  const [active, setActive] = useState('earnings')
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -71,7 +57,9 @@ export default function LeaderboardModal({ onClose }) {
     return () => window.removeEventListener('keydown', handler)
   }, [onClose])
 
-  const rows = data?.[active] ?? []
+  const rows = active === 'earnings' ? data?.income ?? []
+             : active === 'resets'   ? data?.resets  ?? []
+             : []
 
   return (
     <div className="lb-overlay" onClick={onClose}>
@@ -93,23 +81,14 @@ export default function LeaderboardModal({ onClose }) {
           ))}
         </div>
 
-        {(active === 'income' || active === 'training') && (
-          <p className="lb-filter-note">
-            {active === 'income'
-              ? 'Minimum 10 hands played to qualify'
-              : 'Minimum 10 training hands to qualify'}
-          </p>
-        )}
-
         <div className="lb-list">
           {loading && <div className="lb-empty">Loading…</div>}
           {!loading && rows.length === 0 && (
             <div className="lb-empty">No entries yet.</div>
           )}
           {!loading && rows.map((entry, i) => (
-            active === 'income'   ? <IncomeRow   key={entry.username} entry={entry} i={i} /> :
-            active === 'training' ? <TrainingRow key={entry.username} entry={entry} i={i} /> :
-                                    <ResetsRow   key={entry.username} entry={entry} i={i} />
+            active === 'earnings' ? <IncomeRow key={entry.username} entry={entry} i={i} /> :
+                                    <ResetsRow key={entry.username} entry={entry} i={i} />
           ))}
         </div>
       </div>

@@ -149,7 +149,7 @@ export function useBlackjackGame({
       }
     }
     setResultMessage(isNaturalBlackjack ? 'Blackjack!' : result);
-    const incomeDelta = trainingModeRef.current !== 'basic' ? delta - (betAmount ?? currentBet) : 0;
+    const incomeDelta = trainingModeRef.current !== 'basic' ? Math.max(0, delta - (betAmount ?? currentBet)) : 0;
     setStats(prev => {
       const next = {
         hands: prev.hands + 1,
@@ -522,7 +522,7 @@ export function useBlackjackGame({
               if (result2 === 'Player Wins') { setBankroll(prev => prev + bet2 * 2); splitDelta += bet2 * 2; }
               else if (result2 === 'Push') { setBankroll(prev => prev + bet2); splitDelta += bet2; }
             }
-            const splitIncomeDelta = trainingModeRef.current !== 'basic' ? splitDelta - (bet1 + bet2) : 0;
+            const splitIncomeDelta = trainingModeRef.current !== 'basic' ? (result1 === 'Player Wins' ? bet1 : 0) + (result2 === 'Player Wins' ? bet2 : 0) : 0;
             setStats(prev => {
               const next = {
                 hands: prev.hands + 2,

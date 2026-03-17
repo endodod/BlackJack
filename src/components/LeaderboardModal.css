@@ -85,12 +85,6 @@
   color: #f59e0b;
 }
 
-.lb-filter-note {
-  font-size: 0.75em;
-  color: rgba(255, 255, 255, 0.3);
-  text-align: center;
-  margin: 0;
-}
 
 .lb-list {
   display: flex;

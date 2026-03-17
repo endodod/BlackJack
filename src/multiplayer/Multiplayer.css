@@ -479,6 +479,25 @@
   flex-shrink: 0;
 }
 
+.mp-lb-row-disconnected {
+  opacity: 0.38;
+}
+
+.mp-lb-row-pending {
+  opacity: 0.55;
+}
+
+.mp-lb-badge {
+  font-size: 0.68em;
+  font-weight: 700;
+  color: rgba(255,255,255,0.4);
+  background: rgba(255,255,255,0.08);
+  border-radius: 3px;
+  padding: 0.1em 0.3em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 /* Center column: table area + controls */
 .mp-center-col {
   flex: 1;
@@ -511,6 +530,23 @@
 
 .mp-table-area {
   justify-content: space-between;
+  padding-bottom: 0.5em;
+}
+
+.mp-local-hand {
+  margin-top: auto;
+}
+
+.mp-bet-prompt {
+  margin: auto;
+  color: rgba(255,255,255,0.55);
+  font-size: 1.6em;
+  font-weight: 700;
+  font-style: italic;
+  letter-spacing: 0.08em;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.4);
+  pointer-events: none;
+  user-select: none;
 }
 
 .mp-dealer-hand {
@@ -654,6 +690,24 @@
 
 .mp-other-bust-tag   { font-size: 0.62em; font-weight: 800; color: #f87171; }
 .mp-other-status-tag { font-size: 0.62em; color: rgba(245,158,11,0.6); animation: waitingPulse 1.4s ease-in-out infinite; }
+
+.mp-other-window-disconnected {
+  opacity: 0.35;
+}
+
+.mp-other-window-pending {
+  opacity: 0.55;
+  border-style: dashed;
+}
+
+.mp-other-status-joining {
+  color: rgba(99,200,130,0.7);
+}
+
+.mp-other-status-disconnected {
+  color: rgba(255,255,255,0.3);
+  animation: none;
+}
 
 /* ── Legacy slot styles (kept for result rows etc) ─────── */
 
@@ -823,6 +877,146 @@
   font-weight: 700;
   letter-spacing: 0.04em;
   padding: 0.35em 0.85em;
+}
+
+.mp-lobby-badge-code {
+  font-family: monospace;
+  font-size: 0.95em;
+  letter-spacing: 0.18em;
+}
+
+/* Rules strip below header */
+.mp-rules-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6em;
+  padding: 0.6em 2em;
+  background-color: #14532d;
+  background-image: radial-gradient(ellipse at 50% 30%, #166534 0%, #052e16 100%);
+  font-size: 0.88em;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: rgba(0,0,0,0.45);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-variant-numeric: lining-nums;
+  line-height: 1;
+  pointer-events: none;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+/* 3-column header so bankroll sits in the true centre */
+.mp-header {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+}
+
+.mp-header .game-header-right {
+  justify-content: flex-end;
+}
+
+.mp-header-center {
+  display: flex;
+  align-items: center;
+  gap: 0.75em;
+  justify-content: center;
+}
+
+.mp-nav-btn {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 7px;
+  color: rgba(255,255,255,0.6);
+  cursor: pointer;
+  font-size: 0.82em;
+  font-weight: 600;
+  padding: 0.35em 0.75em;
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.mp-nav-btn:hover {
+  background: rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.9);
+}
+
+.mp-nav-btn-lg {
+  font-size: 0.95em;
+  padding: 0.45em 1.1em;
+}
+
+.mp-nav-btn-user {
+  color: #f59e0b;
+  border-color: rgba(245,158,11,0.3);
+  background: rgba(245,158,11,0.07);
+}
+
+.mp-nav-btn-user:hover {
+  background: rgba(245,158,11,0.14);
+  color: #f59e0b;
+}
+
+.menu-item-btn {
+  width: 100%;
+  background: rgba(255,255,255,0.04);
+  border: none;
+  border-radius: 8px;
+  color: rgba(255,255,255,0.75);
+  cursor: pointer;
+  font-size: 0.9em;
+  font-weight: 600;
+  padding: 0.55em 0.9em;
+  text-align: left;
+  transition: background 0.15s;
+  margin-bottom: 0.3em;
+}
+
+.menu-item-btn:hover {
+  background: rgba(255,255,255,0.09);
+}
+
+/* Join lobby modal */
+.mp-join-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+  backdrop-filter: blur(3px);
+}
+
+.mp-join-modal {
+  background: #0f0f1a;
+  border: 1px solid #2a2a40;
+  border-radius: 14px;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+  display: flex;
+  flex-direction: column;
+  gap: 1em;
+  padding: 1.6em;
+  width: 100%;
+  max-width: 300px;
+}
+
+.mp-join-title {
+  font-size: 1.05em;
+  font-weight: 800;
+  color: #f59e0b;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin: 0;
+}
+
+.mp-join-actions {
+  display: flex;
+  gap: 0.5em;
 }
 
 /* ── Controls bar multiplayer elements ────────────────── */
