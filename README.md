@@ -13,7 +13,7 @@ A browser-based Blackjack card game with user accounts, a leaderboard, and a bas
 | **Framework** | Next.js 15 (App Router) |
 | **UI** | React 19 |
 | **Auth** | NextAuth.js v4 |
-| **ORM** | Prisma 5 |
+| **ORM** | Prisma 7 |
 | **Database** | PostgreSQL |
 | **Password hashing** | bcryptjs |
 | **Styling** | Plain CSS |
@@ -23,9 +23,9 @@ A browser-based Blackjack card game with user accounts, a leaderboard, and a bas
 
 ## Features
 
-- Full Blackjack gameplay — bet, hit, stand, double down, split (incl. double after split)
+- Full Blackjack gameplay — bet, hit, stand, double down, split (incl. double after split), resign
 - Animated card dealing with a 4-deck shoe (reshuffles at <25% remaining)
-- Keyboard shortcuts — `W` Hit · `S` Stand · `D` Double · `A` Split
+- Keyboard shortcuts — `W` Hit · `S` Stand · `D` Double · `A` Split · `R` Resign
 - User accounts — register, login, change username/password, delete account
 - Persistent bankroll & stats (hands, wins, losses, pushes, blackjacks, income)
 - Global leaderboard
@@ -39,7 +39,7 @@ A browser-based Blackjack card game with user accounts, a leaderboard, and a bas
 ## Rules
 
 - Dealer stands on soft 17
-- No surrender
+- Resign available on first two cards (lose half your bet); configurable as late (default) or early resign via settings
 - No re-split after split
 
 ---
@@ -103,4 +103,3 @@ npm test
 - Fix Ace logic edge case (2×A)
 - Pro mode — card counting training
 - Mobile support
-- Multiplayer (?)
