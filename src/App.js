@@ -78,7 +78,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
       {/* ── Header ── */}
       <header className="game-header">
         <div className="game-header-left">
-          <a href="/" className="game-title">Blackjack</a>
+          <Link href="/" className="game-title">Blackjack</Link>
           <nav className="game-nav">
             {[
               ['off',   'Singleplayer'],
@@ -320,7 +320,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
       {isOutOfMoney && trainingMode !== 'basic' && (
         <div className="broke-overlay">
           <div className="broke-modal">
-            <h2 className="broke-title">You're broke!</h2>
+            <h2 className="broke-title">You&apos;re broke!</h2>
             <p className="broke-subtitle">Not enough to place a bet.</p>
             <button className="broke-reset-btn" onClick={handleReset}>Reset</button>
           </div>
