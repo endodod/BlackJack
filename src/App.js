@@ -30,6 +30,10 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
   const [showStrategyTable, setShowStrategyTable] = useState(false);
   const [showLeaderboard, setShowLeaderboard]     = useState(false);
   const [testHand, setTestHand]             = useState(null);
+  const [earlyResign, setEarlyResign] = useState(() => {
+    if (typeof window !== 'undefined') return localStorage.getItem('earlyResign') === 'true';
+    return false;
+  });
   const menuRef = useRef(null);
 
   // ── Sync volume ──────────────────────────────────────────────────────────────
@@ -50,10 +54,10 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
     gamePhase, statusMessage, lastBetAmount,
     resultMessage, resultAmount, splitResults,
     strategyStats, trainingFeedback, actionFeedback,
-    isSplitActive, isOutOfMoney, hasSplitPair, canSplit, canDouble,
+    isSplitActive, isOutOfMoney, hasSplitPair, canSplit, canDouble, canResign,
     splitHand2, splitHand1Completed, splitBet, splitHand1Bet,
     playerHand, dealerHand, bankroll, currentBet,
-    dealCards, cancelHand, handleDouble, handleSplit,
+    dealCards, cancelHand, handleDouble, handleSplit, handleResign,
     handleReset, handleResultsClose, handleActionValidation,
   } = useBlackjackGame({
     initialStats,
@@ -61,10 +65,12 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
     onReset,
     onMenuClose: useCallback(() => setMenuOpen(false), []),
     trainingMode,
+    trainingSetup,
     practiceHardHands,
     practiceSoftHands,
     practicePairs,
     testHand,
+    earlyResign,
   });
 
   return (
@@ -132,6 +138,19 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
                     onClick={() => onVolumeChange(!volumeOn)}
                   >
                     {volumeOn ? 'On' : 'Off'}
+                  </button>
+                </div>
+                <div className="menu-row">
+                  <span className="menu-label">Early Resign</span>
+                  <button
+                    className={`menu-toggle${earlyResign ? ' menu-toggle-on' : ''}`}
+                    onClick={() => {
+                      const next = !earlyResign;
+                      setEarlyResign(next);
+                      localStorage.setItem('earlyResign', String(next));
+                    }}
+                  >
+                    {earlyResign ? 'On' : 'Off'}
                   </button>
                 </div>
                 {!session?.user && onShowAuth && (
@@ -266,8 +285,10 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
               hasSplitPair={hasSplitPair}
               canSplit={canSplit}
               canDouble={canDouble}
+              canResign={canResign}
               onDouble={handleDouble}
               onSplit={handleSplit}
+              onResign={handleResign}
               onValidate={trainingMode === 'basic' ? handleActionValidation : undefined}
               actionFeedback={actionFeedback}
             />
