@@ -29,3 +29,6 @@ install.cmd
 .claude
 .vercel
 .env*.local
+
+# PartyKit local dev state
+.partykit/state/
