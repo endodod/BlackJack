@@ -32,3 +32,6 @@ install.cmd
 
 # PartyKit local dev state
 .partykit/state/
+
+# Local files
+todo.md
