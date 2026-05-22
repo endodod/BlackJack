@@ -1,8 +1,8 @@
 # Blackjack
 
-A browser-based Blackjack card game with user accounts, a leaderboard, and a basic strategy trainer.
+A browser-based Blackjack card game with user accounts, a leaderboard, a basic strategy trainer, and real-time multiplayer.
 
-🌐 **Live:** [blackjack.paulkuehn.ch](https://blackjack.paulkuehn.ch)
+**Live:** [blackjack.paulkuehn.ch](https://blackjack.paulkuehn.ch)
 
 ---
 
@@ -14,7 +14,8 @@ A browser-based Blackjack card game with user accounts, a leaderboard, and a bas
 | **UI** | React 19 |
 | **Auth** | NextAuth.js v4 |
 | **ORM** | Prisma 7 |
-| **Database** | PostgreSQL |
+| **Database** | PostgreSQL (Neon) |
+| **Multiplayer** | PartyKit |
 | **Password hashing** | bcryptjs |
 | **Styling** | Plain CSS |
 | **Hosting** | Vercel |
@@ -29,16 +30,19 @@ A browser-based Blackjack card game with user accounts, a leaderboard, and a bas
 - User accounts — register, login, change username/password, delete account
 - Persistent bankroll & stats (hands, wins, losses, pushes, blackjacks, income)
 - Global leaderboard
-- Basic strategy trainer with real-time feedback
+- Real-time multiplayer via PartyKit
+- Basic strategy trainer with real-time feedback — configurable for hard hands, soft hands, and pairs
 - Strategy reference table modal
-- Sound effects (chip, draw, win, bust, clear bet)
-- Cross-monitor scaling fix via `ScaleInit.js`
+- Sound effects with volume slider
+- Mobile-responsive UI
 
 ---
 
 ## Rules
 
+- Blackjack pays 3:2
 - Dealer stands on soft 17
+- 4-deck shoe
 - Resign available on first two cards (lose half your bet)
 - No re-split after split
 
@@ -52,28 +56,35 @@ cd BlackJack
 npm install
 ```
 
-2. Create a `.env.local` file in the project root with the following variables:
-   ```env
-   DATABASE_URL="your-postgres-connection-string"
-   NEXTAUTH_SECRET="your-nextauth-secret"
-   NEXTAUTH_URL="http://localhost:3000"
-   ```
+Create a `.env.local` file in the project root:
 
-3. Generate the Prisma client:
-   ```bash
-   npx prisma generate
-   ```
+```env
+DATABASE_URL="your-postgres-connection-string"
+NEXTAUTH_SECRET="your-nextauth-secret"
+NEXTAUTH_URL="http://localhost:3000"
+```
+
+Generate the Prisma client:
+
+```bash
+npx prisma generate
+```
 
 ### Start the App
 
-You need **two terminals running simultaneously**:
+Run the Next.js dev server:
 
-**Terminal 1 — Next.js app**
 ```bash
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
+
+For multiplayer, run the PartyKit server in a second terminal:
+
+```bash
+npm run party:dev
+```
 
 ---
 
@@ -83,7 +94,7 @@ Open [http://localhost:3000](http://localhost:3000).
 npm test
 ```
 
-224 tests across 13 suites covering:
+224 tests across 13 suites:
 
 | Suite | What it covers |
 |---|---|
@@ -100,11 +111,3 @@ npm test
 | `components/AuthModal` | Login/register flows, error messages, guest mode, HTML required validation |
 | `components/ProfilePage` | Reset game, change username/password, delete account (two-step UI), stats display |
 | `hooks/useBlackjackGame` | Deal, hit, stand, double down, split, natural blackjack payout, edge cases |
-
----
-
-## Planned
-
-- Fix Ace logic edge case (2×A)
-- Pro mode — card counting training
-- Mobile support
