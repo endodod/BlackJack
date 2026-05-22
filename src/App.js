@@ -109,6 +109,12 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
             Leaderboard
           </button>
         </div>
+
+        {/* Mobile-only: centered bankroll */}
+        <div className="mobile-bankroll">
+          {trainingMode !== 'basic' && `$${bankroll}`}
+        </div>
+
         <div className="game-header-right">
           {session?.user?.username && (
             <Link href="/profile" className="hud-item hud-user hud-user-link">{session.user.username}</Link>
@@ -123,15 +129,59 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
             <button
               className={`settings-btn${menuOpen ? ' settings-btn-open' : ''}`}
               onClick={() => setMenuOpen(o => !o)}
-              aria-label="Settings"
+              aria-label="Menu"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              {/* Desktop: gear icon */}
+              <svg className="icon-gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="3"/>
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+              </svg>
+              {/* Mobile: hamburger icon */}
+              <svg className="icon-burger" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <line x1="3" y1="7" x2="21" y2="7"/>
+                <line x1="3" y1="12" x2="21" y2="12"/>
+                <line x1="3" y1="17" x2="21" y2="17"/>
               </svg>
             </button>
             {menuOpen && (
               <div className="menu-panel">
+                {/* Mobile-only: gamemode section */}
+                <div className="menu-mobile-section">
+                  <span className="menu-section-label">Mode</span>
+                  {[
+                    ['off',   'Singleplayer'],
+                    ['basic', 'Training'],
+                  ].map(([val, label]) => (
+                    <button
+                      key={val}
+                      className={`menu-mode-btn${trainingMode === val ? ' menu-mode-btn-active' : ''}`}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        if (val === trainingMode) return;
+                        if (gamePhase !== 'betting') cancelHand();
+                        setTrainingMode(val);
+                        if (val === 'basic') setTrainingSetup(true);
+                      }}
+                    >{label}</button>
+                  ))}
+                  <button
+                    className="menu-mode-btn"
+                    onClick={() => { setMenuOpen(false); if (gamePhase !== 'betting') cancelHand(); onSwitchToMultiplayer?.(); }}
+                  >Multiplayer</button>
+                </div>
+                {/* Mobile-only: account section */}
+                {session?.user?.username && (
+                  <div className="menu-mobile-section">
+                    <span className="menu-section-label">Account</span>
+                    <Link
+                      href="/profile"
+                      className="menu-profile-link"
+                      onClick={() => setMenuOpen(false)}
+                    >{session.user.username}</Link>
+                  </div>
+                )}
+                <div className="menu-mobile-divider" />
+                {/* Settings */}
                 <div className="menu-row menu-volume-slider-row">
                   <span className="menu-label">Volume</span>
                   <input
@@ -161,6 +211,10 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
                     {earlyResign ? 'On' : 'Off'}
                   </button>
                 </div>
+                <div className="menu-divider" />
+                <button className="menu-leaderboard-btn" onClick={() => { setMenuOpen(false); setShowLeaderboard(true); }}>
+                  Leaderboard
+                </button>
                 {!session?.user && onShowAuth && (
                   <>
                     <div className="menu-divider" />
@@ -277,6 +331,30 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
             <PlayerHand hand={playerHand} />
           )}
         </div>
+
+        {/* ── Training strip (mobile only) ── */}
+        {trainingMode === 'basic' && !trainingSetup && (
+          <div className="training-mobile-bar">
+            <div className="training-mobile-bar-actions">
+              <button
+                className="training-hand-btn"
+                onClick={() => { if (gamePhase !== 'betting') cancelHand(); setTrainingSetup(true); }}
+              >
+                Reconfigure
+              </button>
+              <button
+                className="training-hand-btn strategy-table-btn"
+                onClick={() => setShowStrategyTable(true)}
+              >
+                Strategy Table
+              </button>
+            </div>
+            <div className="training-mobile-bar-stats">
+              <span>Hands <strong>{strategyStats.total}</strong></span>
+              <span>Accuracy <strong>{strategyStats.total > 0 ? `${Math.round(strategyStats.correct / strategyStats.total * 100)}%` : '—'}</strong></span>
+            </div>
+          </div>
+        )}
 
         {/* ── Controls bar ── */}
         <div className="controls-bar">
