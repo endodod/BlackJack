@@ -6,14 +6,14 @@ import App from './App'
 import AuthModal from './components/AuthModal'
 import MultiplayerClient from './multiplayer/MultiplayerClient'
 
-export default function GameClient() {
+export default function GameClient({ initialStats }) {
   const { data: session, status } = useSession()
   const [mode, setMode] = useState('singleplayer') // 'singleplayer' | 'multiplayer'
   const [guestMode, setGuestMode] = useState(false)
   const [modalDismissed, setModalDismissed] = useState(false)
   const [volumeOn, setVolumeOn] = useState(true)
   const [userId, setUserId] = useState(session?.user?.id ?? null)
-  const [dbStats, setDbStats] = useState(undefined)
+  const [dbStats, setDbStats] = useState(initialStats !== undefined ? initialStats : undefined)
   const saveTimer = useRef(null)
   const pendingSave = useRef(null)
   const prevUserIdRef = useRef(session?.user?.id)
@@ -102,13 +102,14 @@ export default function GameClient() {
     )
   }
 
-  // Wait for session and DB stats before rendering singleplayer game
-  if (status === 'loading') return null
-  if (status === 'authenticated' && dbStats === undefined) return null
+  // Fallback while session or stats are still resolving (should be near-instant with server prefetch)
+  if (status === 'loading' || (status === 'authenticated' && dbStats === undefined)) {
+    return <div style={{ background: '#08080e', minHeight: '100vh' }} />
+  }
 
   const showModal = status === 'unauthenticated' && !guestMode && !modalDismissed
   const initialBankroll = dbStats?.bankroll ?? 1000
-  const initialStats = dbStats
+  const gameStats = dbStats
     ? { hands: dbStats.hands, wins: dbStats.wins, losses: dbStats.losses, pushes: dbStats.pushes, totalIncome: dbStats.totalIncome ?? 0, blackjacks: dbStats.blackjacks ?? 0, trainingHands: dbStats.trainingHands ?? 0, trainingCorrect: dbStats.trainingCorrect ?? 0 }
     : { hands: 0, wins: 0, losses: 0, pushes: 0, totalIncome: 0, blackjacks: 0, trainingHands: 0, trainingCorrect: 0 }
 
@@ -119,7 +120,7 @@ export default function GameClient() {
       )}
       <DeckProvider key={userId ?? 'guest'} initialBankroll={initialBankroll}>
         <App
-          initialStats={initialStats}
+          initialStats={gameStats}
           onRoundEnd={handleRoundEnd}
           onReset={handleReset}
           onShowAuth={openAuthModal}

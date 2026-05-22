@@ -4,13 +4,16 @@ import '../src/components/BettingPanel.css'
 import '../src/components/ResultPanel.css'
 import ScaleInit from '../src/components/ScaleInit'
 import Providers from '../src/components/Providers'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '../src/lib/auth'
 
 export const metadata = {
   title: 'Blackjack',
   description: 'Blackjack game',
 }
 
-export default function RootLayout({ children }) {
+export default async function RootLayout({ children }) {
+  const session = await getServerSession(authOptions)
   return (
     <html lang="en">
       <head>
@@ -38,7 +41,7 @@ export default function RootLayout({ children }) {
       </head>
       <body className="app-body">
         <ScaleInit />
-        <Providers>{children}</Providers>
+        <Providers session={session}>{children}</Providers>
       </body>
     </html>
   )
