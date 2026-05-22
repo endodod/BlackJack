@@ -1053,6 +1053,10 @@ kbd.key-hint {
     gap: 0.3em;
   }
 
+  .menu-account-btn {
+    display: none;
+  }
+
   .menu-mobile-divider {
     display: block;
     height: 1px;
@@ -1305,5 +1309,25 @@ kbd.key-hint {
 
 .menu-logout-btn:hover {
   background: rgba(239, 68, 68, 0.2);
+}
+
+.menu-account-btn {
+  display: block;
+  width: 100%;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1.5px solid rgba(245, 158, 11, 0.35);
+  border-radius: 8px;
+  color: #f59e0b;
+  font-size: 0.9em;
+  font-weight: 700;
+  padding: 0.55em 1em;
+  cursor: pointer;
+  transition: background 0.15s;
+  text-align: center;
+  text-decoration: none;
+}
+
+.menu-account-btn:hover {
+  background: rgba(245, 158, 11, 0.18);
 }
 

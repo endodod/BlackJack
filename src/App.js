@@ -30,10 +30,8 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
   const [showStrategyTable, setShowStrategyTable] = useState(false);
   const [showLeaderboard, setShowLeaderboard]     = useState(false);
   const [testHand, setTestHand]             = useState(null);
-  const [earlyResign, setEarlyResign] = useState(() => {
-    if (typeof window !== 'undefined') return localStorage.getItem('earlyResign') === 'true';
-    return false;
-  });
+  const [testDealerHand, setTestDealerHand] = useState(null);
+  const earlyResign = true;
   const menuRef = useRef(null);
 
   // ── Sync volume ──────────────────────────────────────────────────────────────
@@ -71,6 +69,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
     practiceSoftHands,
     practicePairs,
     testHand,
+    testDealerHand,
     earlyResign,
   });
 
@@ -198,20 +197,13 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
                     }}
                   />
                 </div>
-                <div className="menu-row">
-                  <span className="menu-label">Early Resign</span>
-                  <button
-                    className={`menu-toggle${earlyResign ? ' menu-toggle-on' : ''}`}
-                    onClick={() => {
-                      const next = !earlyResign;
-                      setEarlyResign(next);
-                      localStorage.setItem('earlyResign', String(next));
-                    }}
-                  >
-                    {earlyResign ? 'On' : 'Off'}
-                  </button>
-                </div>
-                <div className="menu-divider" />
+                {session?.user?.username && (
+                  <Link
+                    href="/profile"
+                    className="menu-account-btn"
+                    onClick={() => setMenuOpen(false)}
+                  >Account</Link>
+                )}
                 <button className="menu-leaderboard-btn" onClick={() => { setMenuOpen(false); setShowLeaderboard(true); }}>
                   Leaderboard
                 </button>
@@ -361,7 +353,12 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
           {gamePhase === 'betting' && trainingMode !== 'basic' && (
             <div className="betting-controls">
               {process.env.NEXT_PUBLIC_TEST_MODE === 'true' && (
-                <TestDealPanel testHand={testHand} onSelect={setTestHand} />
+                <TestDealPanel
+                  testHand={testHand}
+                  onSelect={setTestHand}
+                  testDealerHand={testDealerHand}
+                  onDealerSelect={setTestDealerHand}
+                />
               )}
               <BettingPanel onDeal={dealCards} defaultBet={lastBetAmount} />
             </div>

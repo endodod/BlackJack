@@ -39,7 +39,7 @@ A browser-based Blackjack card game with user accounts, a leaderboard, and a bas
 ## Rules
 
 - Dealer stands on soft 17
-- Resign available on first two cards (lose half your bet); configurable as late (default) or early resign via settings
+- Resign available on first two cards (lose half your bet)
 - No re-split after split
 
 ---

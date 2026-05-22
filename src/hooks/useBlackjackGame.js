@@ -20,13 +20,18 @@ function classifyHandType(c0, c2) {
   return 'hard';
 }
 
-function setupTestHand(deck, v1, v2) {
-  const d = [...deck];
-  const i1 = d.findIndex(c => c.value === v1);
-  if (i1 > 0) { const [c] = d.splice(i1, 1); d.unshift(c); }
-  const i2 = d.findIndex((c, i) => c.value === v2 && i >= 2);
-  if (i2 > 2) { const [c] = d.splice(i2, 1); d.splice(2, 0, c); }
-  return d;
+// Deck positions: 0=player card 1, 1=dealer upcard, 2=player card 2, 3=dealer hole card
+function setupTestCards(deck, p1, p2, d1, d2) {
+  const remaining = [...deck];
+  const targets = [p1, d1, p2, d2]; // ordered by deal position
+  const result = targets.map(value => {
+    if (!value) return null;
+    const idx = remaining.findIndex(c => c.value === value);
+    return idx >= 0 ? remaining.splice(idx, 1)[0] : null;
+  });
+  let ri = 0;
+  const final = result.map(card => card ?? remaining[ri++]);
+  return [...final, ...remaining.slice(ri)];
 }
 
 function findValidArrangement(deck, enabledTypes) {
@@ -60,6 +65,7 @@ export function useBlackjackGame({
   practiceSoftHands,
   practicePairs,
   testHand,
+  testDealerHand,
   earlyResign = false,
 }) {
   const {
@@ -225,8 +231,12 @@ export function useBlackjackGame({
         practicePairs     && 'pair',
       ].filter(Boolean);
       workingDeck = findValidArrangement(deck, enabledTypes);
-    } else if (testHand) {
-      workingDeck = setupTestHand(deck, testHand.v1, testHand.v2);
+    } else if (testHand || testDealerHand) {
+      workingDeck = setupTestCards(
+        deck,
+        testHand?.v1, testHand?.v2,
+        testDealerHand?.v1, testDealerHand?.v2,
+      );
     }
 
     const c0 = workingDeck[0], c1 = workingDeck[1], c2 = workingDeck[2], c3 = workingDeck[3];
