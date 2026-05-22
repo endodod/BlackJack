@@ -1,7 +1,7 @@
 'use client'
 import React, { useEffect, useCallback, useState, useRef } from "react";
 import { useSession, signOut } from 'next-auth/react';
-import { setVolumeEnabled } from "./lib/sound";
+import { setVolumeEnabled, setVolumeLevel as applyVolumeLevel } from "./lib/sound";
 import { useBlackjackGame } from "./hooks/useBlackjackGame";
 import PlayerHand from './components/PlayerHand';
 import DealerHand from './components/DealerHand';
@@ -17,7 +17,7 @@ import Link from 'next/link';
 
 // gamePhase values: 'betting' | 'dealing' | 'player' | 'dealer' | 'pausing' | 'result'
 
-function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIncome: 0, blackjacks: 0, trainingHands: 0, trainingCorrect: 0 }, onRoundEnd, onReset, onShowAuth, volumeOn, onVolumeChange, onSwitchToMultiplayer }) {
+function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIncome: 0, blackjacks: 0, trainingHands: 0, trainingCorrect: 0 }, onRoundEnd, onReset, onShowAuth, volumeOn, onVolumeChange, volumeLevel = 1, onVolumeLevelChange, onSwitchToMultiplayer }) {
   const { data: session } = useSession();
 
   // ── UI-only state ────────────────────────────────────────────────────────────
@@ -38,6 +38,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
 
   // ── Sync volume ──────────────────────────────────────────────────────────────
   useEffect(() => { setVolumeEnabled(volumeOn); }, [volumeOn]);
+  useEffect(() => { applyVolumeLevel(volumeLevel); }, [volumeLevel]);
 
   // ── Close menu on outside click ──────────────────────────────────────────────
   useEffect(() => {
@@ -131,14 +132,21 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
             </button>
             {menuOpen && (
               <div className="menu-panel">
-                <div className="menu-row">
+                <div className="menu-row menu-volume-slider-row">
                   <span className="menu-label">Volume</span>
-                  <button
-                    className={`menu-toggle${volumeOn ? ' menu-toggle-on' : ''}`}
-                    onClick={() => onVolumeChange(!volumeOn)}
-                  >
-                    {volumeOn ? 'On' : 'Off'}
-                  </button>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={volumeLevel}
+                    className="menu-volume-slider"
+                    onChange={e => {
+                      const val = parseFloat(e.target.value);
+                      onVolumeLevelChange?.(val);
+                      onVolumeChange?.(val > 0);
+                    }}
+                  />
                 </div>
                 <div className="menu-row">
                   <span className="menu-label">Early Resign</span>

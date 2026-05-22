@@ -28,6 +28,7 @@ jest.mock('../../lib/sound', () => ({
   playSound: jest.fn(),
   resumeAudio: jest.fn(),
   setVolumeEnabled: jest.fn(),
+  setVolumeLevel: jest.fn(),
 }))
 
 // ── Test helpers ──────────────────────────────────────────────────────────────

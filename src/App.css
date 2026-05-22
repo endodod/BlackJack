@@ -199,6 +199,40 @@
   color: #22c55e;
 }
 
+.menu-volume-slider-row {
+  gap: 0.75em;
+}
+
+.menu-volume-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 110px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.15);
+  outline: none;
+  cursor: pointer;
+}
+
+.menu-volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #22c55e;
+  cursor: pointer;
+}
+
+.menu-volume-slider::-moz-range-thumb {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #22c55e;
+  cursor: pointer;
+  border: none;
+}
+
 .menu-section-label {
   font-size: 0.85em;
   color: rgba(255, 255, 255, 0.4);

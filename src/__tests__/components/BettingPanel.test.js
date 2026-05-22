@@ -20,6 +20,7 @@ jest.mock('../../lib/sound', () => ({
   playSound: jest.fn(),
   resumeAudio: jest.fn(),
   setVolumeEnabled: jest.fn(),
+  setVolumeLevel: jest.fn(),
 }))
 
 function renderPanel({ bankroll = 1000, onDeal = jest.fn(), defaultBet = 0 } = {}) {

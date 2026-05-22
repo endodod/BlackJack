@@ -12,6 +12,7 @@ export default function GameClient({ initialStats }) {
   const [guestMode, setGuestMode] = useState(false)
   const [modalDismissed, setModalDismissed] = useState(false)
   const [volumeOn, setVolumeOn] = useState(true)
+  const [volumeLevel, setVolLevel] = useState(1)
   const [userId, setUserId] = useState(session?.user?.id ?? null)
   const [dbStats, setDbStats] = useState(initialStats !== undefined ? initialStats : undefined)
   const saveTimer = useRef(null)
@@ -24,6 +25,10 @@ export default function GameClient({ initialStats }) {
       const stored = localStorage.getItem('volume')
       if (stored !== null) {
         setVolumeOn(stored === 'true')
+      }
+      const storedLevel = localStorage.getItem('volumeLevel')
+      if (storedLevel !== null) {
+        setVolLevel(parseFloat(storedLevel))
       }
     }
   }, [])
@@ -92,6 +97,13 @@ export default function GameClient({ initialStats }) {
     }
   }, [])
 
+  const handleVolumeLevelChange = useCallback((level) => {
+    setVolLevel(level)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('volumeLevel', level.toString())
+    }
+  }, [])
+
   // Multiplayer mode — completely isolated from singleplayer state
   if (mode === 'multiplayer') {
     return (
@@ -126,6 +138,8 @@ export default function GameClient({ initialStats }) {
           onShowAuth={openAuthModal}
           volumeOn={volumeOn}
           onVolumeChange={handleVolumeChange}
+          volumeLevel={volumeLevel}
+          onVolumeLevelChange={handleVolumeLevelChange}
           onSwitchToMultiplayer={() => setMode('multiplayer')}
         />
       </DeckProvider>
