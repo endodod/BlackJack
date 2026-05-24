@@ -1,5 +1,6 @@
 'use client'
 
+const BASE_VOLUME = 0.5;
 let volumeOn = true;
 let volumeLevel = 1.0;
 let audioCtx = null;
@@ -22,7 +23,7 @@ if (typeof window !== 'undefined') {
   Object.entries(SOUND_FILES).forEach(([event, src]) => {
     const audio = new Audio(src);
     audio.preload = 'auto';
-    audio.volume = volumeLevel;
+    audio.volume = BASE_VOLUME * volumeLevel;
     audio.addEventListener('canplaythrough', () => { audioReady[event] = true; }, { once: true });
     audio.addEventListener('error', () => { audioReady[event] = false; }, { once: true });
     audioCache[event] = audio;
@@ -50,7 +51,7 @@ export function resumeAudio() {
 function setVolumeEnabled(enabled) {
   volumeOn = !!enabled;
   Object.values(audioCache).forEach(audio => {
-    if (audio) audio.volume = volumeOn ? volumeLevel : 0;
+    if (audio) audio.volume = volumeOn ? BASE_VOLUME * volumeLevel : 0;
   });
 }
 
@@ -58,7 +59,7 @@ export function setVolumeLevel(level) {
   volumeLevel = Math.max(0, Math.min(1, level));
   if (volumeOn) {
     Object.values(audioCache).forEach(audio => {
-      if (audio) audio.volume = volumeLevel;
+      if (audio) audio.volume = BASE_VOLUME * volumeLevel;
     });
   }
 }
@@ -72,7 +73,7 @@ function playAudioEvent(event) {
   const audio = audioCache[event];
   if (!audio) return false;
 
-  audio.volume = volumeLevel;
+  audio.volume = BASE_VOLUME * volumeLevel;
   audio.currentTime = 0;
   const promise = audio.play();
   if (promise !== undefined) {
@@ -96,7 +97,7 @@ function playTone({ frequency, duration = 0.12, type = 'sine', volume = 0.18, wh
   osc.frequency.value = frequency;
 
   gain.gain.setValueAtTime(0, ctx.currentTime + when);
-  gain.gain.linearRampToValueAtTime(volume * volumeLevel, ctx.currentTime + when + 0.01);
+  gain.gain.linearRampToValueAtTime(volume * BASE_VOLUME * volumeLevel, ctx.currentTime + when + 0.01);
   gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + when + duration);
 
   osc.connect(gain);
@@ -119,7 +120,7 @@ function playNoise({ duration = 0.14, volume = 0.18, when = 0 }) {
   source.buffer = buffer;
 
   const gain = ctx.createGain();
-  gain.gain.setValueAtTime(volume * volumeLevel, ctx.currentTime + when);
+  gain.gain.setValueAtTime(volume * BASE_VOLUME * volumeLevel, ctx.currentTime + when);
   gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + when + duration);
 
   source.connect(gain);
@@ -150,7 +151,7 @@ function playCardDraw({ duration = 0.16, volume = 0.16, when = 0 }) {
   filter.frequency.linearRampToValueAtTime(1200, ctx.currentTime + when + duration);
 
   const gain = ctx.createGain();
-  gain.gain.setValueAtTime(volume * volumeLevel, ctx.currentTime + when);
+  gain.gain.setValueAtTime(volume * BASE_VOLUME * volumeLevel, ctx.currentTime + when);
   gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + when + duration);
 
   source.connect(filter);
