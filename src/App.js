@@ -111,18 +111,31 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
 
         {/* Mobile-only: centered bankroll */}
         <div className="mobile-bankroll">
-          {trainingMode !== 'basic' && `$${bankroll}`}
+          {trainingMode !== 'basic' && (
+            <>
+              ${bankroll}
+              {currentBet > 0 && (
+                <span className="mobile-bet">
+                  Bet: ${isSplitActive ? (splitHand1Completed.length > 0 ? splitHand1Bet : splitBet) + currentBet : currentBet}
+                </span>
+              )}
+            </>
+          )}
         </div>
 
         <div className="game-header-right">
+          {trainingMode !== 'basic' && (
+            <div className="hud-bankroll-group">
+              <span className="hud-bankroll-value">${bankroll}</span>
+              {currentBet > 0 && (
+                <span className="hud-bet-inline">
+                  Bet: ${isSplitActive ? (splitHand1Completed.length > 0 ? splitHand1Bet : splitBet) + currentBet : currentBet}
+                </span>
+              )}
+            </div>
+          )}
           {session?.user?.username && (
             <Link href="/profile" className="hud-item hud-user hud-user-link">{session.user.username}</Link>
-          )}
-          {trainingMode !== 'basic' && <span className="hud-item">Bankroll: ${bankroll}</span>}
-          {trainingMode !== 'basic' && currentBet > 0 && (
-            <span className="hud-item hud-bet">
-              Bet: ${isSplitActive ? (splitHand1Completed.length > 0 ? splitHand1Bet : splitBet) + currentBet : currentBet}
-            </span>
           )}
           <div className="menu-container" ref={menuRef}>
             <button
