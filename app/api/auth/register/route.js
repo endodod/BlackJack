@@ -3,7 +3,9 @@ import bcrypt from 'bcryptjs'
 import prisma from '../../../../src/lib/prisma'
 
 export async function POST(req) {
-  const { username, password } = await req.json()
+  const body = await req.json()
+  const username = body.username?.trim() ?? ''
+  const { password } = body
 
   if (!username || username.length < 3 || username.length > 20) {
     return NextResponse.json({ error: 'Username must be 3–20 characters' }, { status: 400 })

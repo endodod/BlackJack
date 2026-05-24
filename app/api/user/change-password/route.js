@@ -17,6 +17,7 @@ export async function POST(req) {
   }
 
   const user = await prisma.user.findUnique({ where: { id: session.user.id } })
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const valid = await bcrypt.compare(currentPassword, user.password)
   if (!valid) {
     return NextResponse.json({ error: 'Incorrect current password' }, { status: 403 })

@@ -3,9 +3,8 @@
  *
  * Tests for POST /api/auth/register
  * Route: app/api/auth/register/route.js
- * Validation: username 3–20 chars, password ≥ 6 chars
+ * Validation: username trimmed then 3–20 chars, password ≥ 6 chars
  * Note: No special-character restriction — only length is checked.
- * Note: Whitespace-only usernames pass the length check (server does NOT trim).
  */
 
 import { POST } from '../../../app/api/auth/register/route'
@@ -106,16 +105,10 @@ describe('AUTH: REGISTER — API', () => {
       expect(res.status).toBe(400)
     })
 
-    /**
-     * Whitespace-only username ("   " = 3 chars) PASSES the length check.
-     * The server does NOT trim usernames. This is a known gap — document for future fix.
-     */
-    it('whitespace-only username (3 spaces) — passes length check, gets stored as-is', async () => {
-      prisma.user.findUnique.mockResolvedValue(null)
-      prisma.user.create.mockResolvedValue({})
+    it('whitespace-only username (3 spaces) → 400 after trim', async () => {
       const res = await POST(makeReq({ username: '   ', password: 'secret123' }))
-      // Server does not trim → length 3 passes → 201
-      expect(res.status).toBe(201)
+      // Server trims username → empty string → fails length check
+      expect(res.status).toBe(400)
     })
   })
 

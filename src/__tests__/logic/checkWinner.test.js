@@ -10,13 +10,13 @@ describe('checkWinner', () => {
       expect(checkWinner({ playerHand, dealerHand })).toBe('Player Wins')
     })
 
-    it('dealer bust with player also at > 21 — dealer bust checked first', () => {
-      // Note: checkWinner checks dealer bust BEFORE player bust,
-      // so dealer bust always returns 'Player Wins' even if player also busted.
-      // This is correct per the code's evaluation order.
+    it('both bust — player bust checked first → House Wins', () => {
+      // In Blackjack, the player acts first. If the player busts, they lose
+      // immediately — the dealer never draws. checkWinner checks player bust
+      // before dealer bust, so a both-bust scenario resolves as House Wins.
       const playerHand = [card('J'), card('K'), card('5')] // 25
       const dealerHand = [card('J'), card('Q'), card('5')] // 25
-      expect(checkWinner({ playerHand, dealerHand })).toBe('Player Wins')
+      expect(checkWinner({ playerHand, dealerHand })).toBe('House Wins')
     })
   })
 
