@@ -4,12 +4,12 @@ export default function checkWinner({playerHand, dealerHand}) {
     const playertotal = getHandTotal(playerHand)
     const dealertotal = getHandTotal(dealerHand)
 
-    if (dealertotal > 21) {
-        return 'Player Wins'
-    }
-
     if (playertotal > 21) {
         return 'House Wins'
+    }
+
+    if (dealertotal > 21) {
+        return 'Player Wins'
     }
 
     if (dealertotal > playertotal) {

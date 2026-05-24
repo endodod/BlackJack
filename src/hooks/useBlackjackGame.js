@@ -562,7 +562,12 @@ export function useBlackjackGame({
             setGamePhase('result');
           }, 1500);
         } else {
-          setTimeout(() => { if (handIdRef.current !== handId) return; setPlayerTurn(false); }, 650);
+          gameTransitionRef.current = true;
+          setTimeout(() => {
+            if (handIdRef.current !== handId) return;
+            gameTransitionRef.current = false;
+            setPlayerTurn(false);
+          }, 650);
         }
       }
       return;
@@ -592,6 +597,9 @@ export function useBlackjackGame({
           if (ph1.length > 0) {
             const result1 = checkWinner({ playerHand: ph1, dealerHand: dh });
             const result2 = checkWinner({ playerHand: ph, dealerHand: dh });
+            const hasWin  = result1 === 'Player Wins' || result2 === 'Player Wins';
+            const hasPush = !hasWin && (result1 === 'Push' || result2 === 'Push');
+            playSound(hasWin ? 'win' : hasPush ? 'push' : 'bust');
             let splitDelta = 0;
             if (trainingModeRef.current !== 'basic') {
               if (result1 === 'Player Wins') { setBankroll(prev => prev + bet1 * 2); splitDelta += bet1 * 2; }
