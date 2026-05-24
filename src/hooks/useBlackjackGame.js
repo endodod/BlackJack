@@ -352,8 +352,8 @@ export function useBlackjackGame({
     setDeck(prev => prev.slice(2));
     setPlayerHand([card1]);
     setSplitHand2([card2]);
-    setTimeout(() => setPlayerHand([card1, newCard1]), 650);
-    setTimeout(() => setSplitHand2([card2, newCard2]), 1300);
+    setTimeout(() => { playSound('draw'); setPlayerHand([card1, newCard1]); }, 650);
+    setTimeout(() => { playSound('draw'); setSplitHand2([card2, newCard2]); }, 1300);
   }, [playerHand, splitHand2, splitHand1Completed, currentBet, bankroll, deck, setBankroll, setDeck, setPlayerHand,
       handleActionValidation]);
 
