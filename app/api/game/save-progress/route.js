@@ -17,10 +17,17 @@ export async function POST(req) {
   if (trainingHands !== undefined) data.trainingHands = trainingHands
   if (trainingCorrect !== undefined) data.trainingCorrect = trainingCorrect
 
-  await prisma.user.update({
-    where: { id: session.user.id },
-    data,
-  })
+  try {
+    await prisma.user.update({
+      where: { id: session.user.id },
+      data,
+    })
+  } catch (err) {
+    if (err?.code === 'P2025') {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+    throw err
+  }
 
   return NextResponse.json({ success: true })
 }

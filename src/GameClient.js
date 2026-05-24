@@ -1,6 +1,6 @@
 'use client'
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { useSession } from 'next-auth/react'
+import { useSession, signOut } from 'next-auth/react'
 import { DeckProvider } from './context/DeckContext'
 import App from './App'
 import AuthModal from './components/AuthModal'
@@ -69,11 +69,12 @@ export default function GameClient({ initialStats }) {
       const data = pendingSave.current
       if (!data) return
       try {
-        await fetch('/api/game/save-progress', {
+        const res = await fetch('/api/game/save-progress', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data),
         })
+        if (res.status === 404) signOut()
       } catch (e) { console.error('Save failed:', e) }
     }, 800)
   }, [session])
