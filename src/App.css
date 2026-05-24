@@ -1059,7 +1059,8 @@ kbd.key-hint {
   }
 
   .game-header-right .hud-item,
-  .game-header-right .hud-user-link {
+  .game-header-right .hud-user-link,
+  .game-header-right .hud-bankroll-group {
     display: none;
   }
 
