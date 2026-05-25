@@ -62,7 +62,7 @@
 
 ### Prerequisites
 
-- Node.js 20+
+- Node.js 20.19+ (or 22.12+)
 - A PostgreSQL database — [Neon](https://neon.tech) free tier works
 
 ### Install
