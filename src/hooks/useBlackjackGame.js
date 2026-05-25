@@ -562,12 +562,7 @@ export function useBlackjackGame({
             setGamePhase('result');
           }, 1500);
         } else {
-          gameTransitionRef.current = true;
-          setTimeout(() => {
-            if (handIdRef.current !== handId) return;
-            gameTransitionRef.current = false;
-            setPlayerTurn(false);
-          }, 650);
+          setPlayerTurn(false);
         }
       }
       return;
