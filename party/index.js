@@ -41,10 +41,11 @@ function checkWinner(playerHand, dealerHand) {
 export default class BlackjackParty {
   constructor(room) {
     this.room = room;
-    // Lobby state — one instance per room (= one lobby per room ID)
     this.players = [];
+    this.spectators = []; // { id, name, bankroll, approvedToJoin }
     this.hostId = null;
     this.status = 'waiting'; // waiting | betting | playing | dealer | round-end
+    this.startingBalance = 1000;
     this.deck = createShoe();
     this.dealerHand = [];
     this.dealerHoleHidden = true;
@@ -53,8 +54,7 @@ export default class BlackjackParty {
   }
 
   onConnect(conn) {
-    // Send current state to reconnecting players or late joiners
-    if (this.players.length > 0) {
+    if (this.players.length > 0 || this.spectators.length > 0) {
       conn.send(JSON.stringify({ type: 'lobby:sync', state: this.publicState() }));
     }
   }
@@ -82,13 +82,16 @@ export default class BlackjackParty {
       hand1Completed: null,
       hand1Bet: 0,
       splitBet: 0,
-      handStatus: 'betting', // betting | waiting | acting | stood | busted | done
+      handStatus: 'betting',
       result: null,
       splitResult: null,
       resultAmount: 0,
       splitResultAmount: 0,
-      forcedReset: false,
     };
+  }
+
+  makeSpectator(connId, name, bankroll = 0) {
+    return { id: connId, name: (name || 'Player').slice(0, 20), bankroll, approvedToJoin: false };
   }
 
   publicState() {
@@ -96,6 +99,7 @@ export default class BlackjackParty {
       code: this.room.id,
       status: this.status,
       hostId: this.hostId,
+      startingBalance: this.startingBalance,
       players: this.players.map(p => ({
         id: p.id,
         name: p.name,
@@ -111,7 +115,12 @@ export default class BlackjackParty {
         splitResult: p.splitResult,
         resultAmount: p.resultAmount,
         splitResultAmount: p.splitResultAmount,
-        forcedReset: p.forcedReset || false,
+      })),
+      spectators: this.spectators.map(s => ({
+        id: s.id,
+        name: s.name,
+        bankroll: s.bankroll,
+        approvedToJoin: s.approvedToJoin,
       })),
       dealerHand: this.dealerHand,
       dealerHoleHidden: this.dealerHoleHidden,
@@ -124,6 +133,25 @@ export default class BlackjackParty {
     this.room.broadcast(JSON.stringify(msg));
   }
 
+  // Reset game to waiting state, merging all spectators back as players
+  doReset() {
+    for (const s of this.spectators) {
+      const p = this.makePlayer(s.id, s.name);
+      p.bankroll = this.startingBalance;
+      this.players.push(p);
+    }
+    this.spectators = [];
+    this.dealerHand = [];
+    this.dealerHoleHidden = true;
+    this.currentPlayerIndex = -1;
+    this.status = 'waiting';
+    this.round = 0;
+    if (!this.players.find(p => p.id === this.hostId) && this.players.length > 0) {
+      this.hostId = this.players[0].id;
+    }
+    this.broadcast({ type: 'lobby:reset', state: this.publicState() });
+  }
+
   // ── Message handler ────────────────────────────────────────────────────────
 
   handleMessage(sender, msg) {
@@ -132,7 +160,6 @@ export default class BlackjackParty {
     // ── Lobby create ──────────────────────────────────────────────────────────
     if (type === 'lobby:create') {
       if (this.players.length > 0) {
-        // Room already taken — code collision (very rare with 4-char codes)
         sender.send(JSON.stringify({ type: 'error', message: 'Lobby code already in use. Try again.' }));
         return;
       }
@@ -150,20 +177,28 @@ export default class BlackjackParty {
 
     // ── Lobby join ────────────────────────────────────────────────────────────
     if (type === 'lobby:join') {
-      if (this.players.length === 0) {
+      if (this.players.length === 0 && this.spectators.length === 0) {
         sender.send(JSON.stringify({ type: 'error', message: 'Lobby not found.' }));
         return;
       }
+      // Already connected as active player or spectator
+      if (this.players.some(p => p.id === sender.id) || this.spectators.some(s => s.id === sender.id)) {
+        sender.send(JSON.stringify({ type: 'error', message: 'Already in lobby.' }));
+        return;
+      }
+      // Mid-game join → spectator
       if (this.status !== 'waiting') {
-        sender.send(JSON.stringify({ type: 'error', message: 'Game has already started.' }));
+        this.spectators.push(this.makeSpectator(sender.id, msg.name, 0));
+        sender.send(JSON.stringify({
+          type: 'spectator:joined',
+          state: this.publicState(),
+          playerId: sender.id,
+        }));
+        this.broadcast({ type: 'lobby:update', state: this.publicState() });
         return;
       }
       if (this.players.length >= 5) {
         sender.send(JSON.stringify({ type: 'error', message: 'Lobby is full (5/5).' }));
-        return;
-      }
-      if (this.players.some(p => p.id === sender.id)) {
-        sender.send(JSON.stringify({ type: 'error', message: 'Already in lobby.' }));
         return;
       }
       const player = this.makePlayer(sender.id, msg.name);
@@ -178,6 +213,17 @@ export default class BlackjackParty {
       return;
     }
 
+    // ── Lobby setting (host only) ─────────────────────────────────────────────
+    if (type === 'lobby:setting') {
+      if (this.hostId !== sender.id) return;
+      if (this.status !== 'waiting') return;
+      if (msg.key === 'startingBalance' && Number.isInteger(msg.value) && msg.value >= 1) {
+        this.startingBalance = msg.value;
+        this.broadcast({ type: 'lobby:update', state: this.publicState() });
+      }
+      return;
+    }
+
     // ── Lobby start (host only) ───────────────────────────────────────────────
     if (type === 'lobby:start') {
       if (this.hostId !== sender.id) {
@@ -189,13 +235,41 @@ export default class BlackjackParty {
         return;
       }
       if (this.status !== 'waiting') return;
+      for (const p of this.players) p.bankroll = this.startingBalance;
       this.status = 'betting';
       this.round = 1;
       this.broadcast({ type: 'game:started', state: this.publicState() });
       return;
     }
 
-    // ── All game actions require the player to be in the lobby ────────────────
+    // ── Lobby reset (host only) ───────────────────────────────────────────────
+    if (type === 'lobby:reset') {
+      if (this.hostId !== sender.id) return;
+      if (this.status === 'waiting') return;
+      this.doReset();
+      return;
+    }
+
+    // ── Host: approve spectator to join next round ────────────────────────────
+    if (type === 'host:approve-join') {
+      if (this.hostId !== sender.id) return;
+      const spec = this.spectators.find(s => s.id === msg.targetId);
+      if (spec) {
+        spec.approvedToJoin = !spec.approvedToJoin; // toggle
+        this.broadcast({ type: 'lobby:update', state: this.publicState() });
+      }
+      return;
+    }
+
+    // ── Host: remove spectator ────────────────────────────────────────────────
+    if (type === 'host:remove-spectator') {
+      if (this.hostId !== sender.id) return;
+      this.spectators = this.spectators.filter(s => s.id !== msg.targetId);
+      this.broadcast({ type: 'lobby:update', state: this.publicState() });
+      return;
+    }
+
+    // ── All game actions require the player to be in the active players list ───
     const player = this.players.find(p => p.id === sender.id);
     if (!player) return;
 
@@ -389,7 +463,6 @@ export default class BlackjackParty {
       if (player.result === 'Resigned') continue;
 
       if (player.hand1Completed && player.hand1Completed.length > 0) {
-        // ── Split resolution ─────────────────────────────────────────────────
         const r1 = checkWinner(player.hand1Completed, dealerH);
         const r2 = checkWinner(player.hand, dealerH);
         let payout = 0;
@@ -403,7 +476,6 @@ export default class BlackjackParty {
         player.splitResult = r2;
         player.splitResultAmount = player.bet;
       } else {
-        // ── Single hand resolution ───────────────────────────────────────────
         const result = checkWinner(player.hand, dealerH);
         const isNaturalBJ = (
           result === 'Player Wins' &&
@@ -420,26 +492,42 @@ export default class BlackjackParty {
       }
     }
 
-    // Forced reset: any player at $0 gets topped back up to $1000
-    for (const player of this.players) {
-      if (player.bankroll <= 0) {
-        player.bankroll = 1000;
-        player.forcedReset = true;
-      }
-    }
-
     this.status = 'round-end';
     this.broadcast({ type: 'game:round-end', state: this.publicState() });
 
-    // Auto-advance to next round after 5 s
+    // After showing results, move bankrupt players to spectators and advance
     setTimeout(() => {
       if (this.players.length === 0) return;
+
+      // Move players with bankroll < 10 to spectators
+      const toSpectate = this.players.filter(p => p.bankroll < 10);
+      for (const p of toSpectate) {
+        this.spectators.push(this.makeSpectator(p.id, p.name, p.bankroll));
+      }
+      this.players = this.players.filter(p => p.bankroll >= 10);
+
+      // All active players bankrupt → reset lobby
+      if (this.players.length === 0) {
+        this.doReset();
+        return;
+      }
+
       this.startNewRound();
     }, 5000);
   }
 
   startNewRound() {
     if (this.deck.length < RESHUFFLE_THRESHOLD) this.deck = createShoe();
+
+    // Move approved spectators into active players
+    const approved = this.spectators.filter(s => s.approvedToJoin);
+    for (const s of approved) {
+      const p = this.makePlayer(s.id, s.name);
+      p.bankroll = this.startingBalance;
+      this.players.push(p);
+    }
+    this.spectators = this.spectators.filter(s => !s.approvedToJoin);
+
     for (const p of this.players) {
       p.bet = 0;
       p.hand = [];
@@ -452,7 +540,6 @@ export default class BlackjackParty {
       p.splitResult = null;
       p.resultAmount = 0;
       p.splitResultAmount = 0;
-      p.forcedReset = false;
     }
     this.dealerHand = [];
     this.dealerHoleHidden = true;
@@ -465,7 +552,6 @@ export default class BlackjackParty {
   dealCards() {
     this.status = 'dealing';
     const n = this.players.length;
-    // Deal right to left (highest index first), two passes
     for (let i = n - 1; i >= 0; i--) this.players[i].hand.push(this.deck.shift());
     this.dealerHand.push(this.deck.shift());
     for (let i = n - 1; i >= 0; i--) this.players[i].hand.push(this.deck.shift());
@@ -475,7 +561,6 @@ export default class BlackjackParty {
     for (const p of this.players) p.handStatus = 'waiting';
 
     if (dealerTotal === 21) {
-      // Dealer blackjack — reveal hole card and end round immediately
       this.status = 'dealer';
       this.dealerHoleHidden = false;
       this.broadcast({ type: 'game:dealt', state: this.publicState() });
@@ -483,7 +568,6 @@ export default class BlackjackParty {
       return;
     }
 
-    // Auto-stand players with natural blackjack
     for (const p of this.players) {
       if (getHandTotal(p.hand) === 21) p.handStatus = 'stood';
     }
@@ -491,7 +575,6 @@ export default class BlackjackParty {
     this.status = 'playing';
     const firstActive = this.players.findIndex(p => p.handStatus === 'waiting');
     if (firstActive === -1) {
-      // All players have blackjack — go straight to dealer
       this.currentPlayerIndex = -1;
       this.broadcast({ type: 'game:dealt', state: this.publicState() });
       setTimeout(() => this.startDealerPhase(), 1500);
@@ -531,16 +614,24 @@ export default class BlackjackParty {
   // ── Disconnect cleanup ─────────────────────────────────────────────────────
 
   cleanupPlayer(connId) {
+    // Remove from spectators if spectating
+    const specIdx = this.spectators.findIndex(s => s.id === connId);
+    if (specIdx !== -1) {
+      this.spectators.splice(specIdx, 1);
+      if (this.players.length > 0 || this.spectators.length > 0) {
+        this.broadcast({ type: 'lobby:update', state: this.publicState() });
+      }
+      return;
+    }
+
     const idx = this.players.findIndex(p => p.id === connId);
     if (idx === -1) return;
 
     this.players.splice(idx, 1);
     if (this.players.length === 0) return;
 
-    // Reassign host if host left
     if (this.hostId === connId) this.hostId = this.players[0].id;
 
-    // Adjust turn index if a player left during the action phase
     if (this.status === 'playing') {
       if (idx < this.currentPlayerIndex) {
         this.currentPlayerIndex--;
@@ -552,7 +643,6 @@ export default class BlackjackParty {
       }
     }
 
-    // If we were waiting for this player's bet, check if everyone else has bet
     if (this.status === 'betting') {
       const allBet = this.players.every(p => p.handStatus !== 'betting');
       if (allBet) setTimeout(() => this.dealCards(), 500);

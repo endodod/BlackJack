@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, Fragment } from 'react';
 import Card from '../components/Card';
 import getHandTotal from '../logic/getHandTotal';
 import { playSound } from '../lib/sound';
@@ -68,7 +68,7 @@ function resultClass(result) {
     : result ? 'mp-slot-result-lose' : '';
 }
 
-function PlayerWindow({ player, isActive, isLocal }) {
+function PlayerWindow({ player, isActive, isLocal, isPlayerHost }) {
   if (!player) return null;
   const isSplit = player.hand1Completed && player.hand1Completed.length > 0;
   const isDone = player.handStatus === 'stood' || player.handStatus === 'busted';
@@ -87,6 +87,7 @@ function PlayerWindow({ player, isActive, isLocal }) {
     <div className={windowClass}>
       <div className="mp-other-window-name">
         <span className="mp-other-window-name-text">{player.name}</span>
+        {isPlayerHost && <span className="mp-other-window-host">HOST</span>}
         {isLocal && <span className="mp-other-window-you">you</span>}
       </div>
       {player.bet > 0 && <div className="mp-slot-bet">${player.bet}</div>}
@@ -268,15 +269,19 @@ function ActionButtons({ player, send }) {
 
 // ── Main table component ──────────────────────────────────────────────────────
 
-export default function MultiplayerTable({ gameState, playerId, send, onLeave, volumeOn }) {
+export default function MultiplayerTable({ gameState, playerId, send, onLeave, volumeOn, onApproveJoin, onRemoveSpectator, onResetLobby }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
-  const { players = [], dealerHand = [], dealerHoleHidden, currentPlayerIndex, status, code, round } = gameState || {};
+  const { players = [], dealerHand = [], dealerHoleHidden, currentPlayerIndex, status, code, round, hostId, spectators: spectatorsList = [] } = gameState || {};
 
   const localPlayer = players.find(p => p.id === playerId);
   const localPlayerIndex = players.findIndex(p => p.id === playerId);
   const otherPlayers = players.filter(p => p.id !== playerId);
+
+  const localSpectator = spectatorsList.find(s => s.id === playerId);
+  const isSpectating = !!localSpectator;
+  const isHost = localPlayer?.id === hostId || (!localPlayer && gameState?.hostId === playerId);
 
   const isLocalPlayerTurn = status === 'playing' && currentPlayerIndex === localPlayerIndex && localPlayer?.handStatus === 'acting';
   const isLocalBetting = status === 'betting' && localPlayer?.handStatus === 'betting';
@@ -327,8 +332,15 @@ export default function MultiplayerTable({ gameState, playerId, send, onLeave, v
           <span className="mp-lobby-badge">Multiplayer</span>
         </div>
         <div className="game-header-right">
-          {localPlayer && <span className="hud-item">Bankroll: ${localPlayer.bankroll}</span>}
-          {localPlayer?.bet > 0 && <span className="hud-item hud-bet">Bet: ${localPlayer.bet}</span>}
+          {(localPlayer || localSpectator) && (
+            <div className="hud-bankroll-group">
+              <span className="hud-bankroll-value">${(localPlayer ?? localSpectator).bankroll}</span>
+              {localPlayer?.bet > 0 && (
+                <span className="hud-bet-inline">Bet: ${localPlayer.bet}</span>
+              )}
+              {isSpectating && <span className="hud-bet-inline">Spectating</span>}
+            </div>
+          )}
           <div className="menu-container" ref={menuRef}>
             <button className={`settings-btn${menuOpen ? ' settings-btn-open' : ''}`} onClick={() => setMenuOpen(o => !o)} aria-label="Settings">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -365,12 +377,49 @@ export default function MultiplayerTable({ gameState, playerId, send, onLeave, v
                 <div key={p.id} className={`mp-lb-row${p.id === playerId ? ' mp-lb-row-you' : ''}`}>
                   <span className="mp-lb-rank">{i + 1}</span>
                   <span className="mp-lb-name">{p.name}</span>
+                  {p.id === hostId && <span className="mp-lb-host">HOST</span>}
                   {p.id === playerId && <span className="mp-lb-you">YOU</span>}
                   <span className="mp-lb-bankroll">${p.bankroll}</span>
                 </div>
               ))
             }
           </div>
+
+          {isHost && (
+            <>
+              <div className="mp-sidebar-divider" />
+              <div className="mp-sidebar-section mp-sidebar-host-controls">
+                <span className="mp-sidebar-label">Host Controls</span>
+                <button className="mp-host-btn mp-host-btn-danger" onClick={onResetLobby}>
+                  Reset Lobby
+                </button>
+              </div>
+
+              {spectatorsList.length > 0 && (
+                <>
+                  <div className="mp-sidebar-divider" />
+                  <div className="mp-sidebar-section mp-sidebar-spectators">
+                    <span className="mp-sidebar-label">Spectating</span>
+                    {spectatorsList.map(s => (
+                      <div key={s.id} className="mp-spectator-row">
+                        <span className="mp-spectator-name">{s.name}</span>
+                        <div className="mp-spectator-actions">
+                          <button
+                            className={`mp-allow-btn${s.approvedToJoin ? ' mp-allow-btn-approved' : ''}`}
+                            onClick={() => onApproveJoin(s.id)}
+                            title={s.approvedToJoin ? 'Approved for next round' : 'Allow to join next round'}
+                          >
+                            {s.approvedToJoin ? '✓' : 'Allow'}
+                          </button>
+                          <button className="mp-remove-btn" onClick={() => onRemoveSpectator(s.id)} title="Remove">✕</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
+          )}
         </aside>
 
         {/* ── Center: table + controls ── */}
@@ -393,60 +442,76 @@ export default function MultiplayerTable({ gameState, playerId, send, onLeave, v
 
           {/* ── Controls bar ── */}
           <div className="controls-bar">
-          {isLocalBetting && (
-            <div className="betting-controls">
-              <BettingPanel bankroll={localPlayer.bankroll} onBet={handleBet} />
+          {isSpectating ? (
+            <div className="mp-spectating-overlay">
+              <p className="mp-spectating-title">You're out of chips</p>
+              <p className="mp-spectating-hint">Waiting for the host to let you back in…</p>
             </div>
-          )}
-
-          {status === 'betting' && !isLocalBetting && (
-            <div className="mp-waiting-indicator">
-              <span className="mp-turn-label">Waiting for others to bet…</span>
-            </div>
-          )}
-
-          {isLocalPlayerTurn && localPlayer && (
-            <ActionButtons player={localPlayer} send={send} />
-          )}
-
-          {status === 'playing' && !isLocalPlayerTurn && (
-            <div className="mp-waiting-indicator">
-              <span className="mp-turn-label">
-                {currentPlayerIndex >= 0 && players[currentPlayerIndex]
-                  ? `${players[currentPlayerIndex].name}'s turn`
-                  : 'Waiting…'}
-              </span>
-            </div>
-          )}
-
-          {(status === 'dealing' || status === 'dealer') && (
-            <div className="mp-waiting-indicator">
-              <span className="waiting-dots">• • •</span>
-            </div>
-          )}
-
-          {status === 'round-end' && (
-            <div className="mp-round-end">
-              <div className="mp-round-end-results">
-                {players.map(p => (
-                  <div key={p.id} className="mp-round-result-row">
-                    <span className="mp-round-result-name">{p.name}:</span>
-                    <span className={`mp-round-result-label ${p.result === 'Player Wins' || p.result === 'Blackjack!' ? 'stat-win' : p.result === 'Push' ? 'stat-push' : p.result === 'Resigned' ? 'stat-loss' : 'stat-loss'}`}>
-                      {p.result || '—'}
-                    </span>
-                    {p.splitResult && (
-                      <>
-                        <span className="mp-round-result-name"> / </span>
-                        <span className={`mp-round-result-label ${p.splitResult === 'Player Wins' ? 'stat-win' : p.splitResult === 'Push' ? 'stat-push' : 'stat-loss'}`}>
-                          {p.splitResult}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                ))}
+          ) : (
+            <>
+            {isLocalBetting && (
+              <div className="betting-controls">
+                <BettingPanel bankroll={localPlayer.bankroll} onBet={handleBet} />
               </div>
-              <p className="mp-next-round-hint">Next round starting automatically…</p>
-            </div>
+            )}
+
+            {status === 'betting' && !isLocalBetting && (
+              <div className="mp-waiting-indicator">
+                <span className="mp-turn-label">Waiting for others to bet…</span>
+              </div>
+            )}
+
+            {isLocalPlayerTurn && localPlayer && (
+              <ActionButtons player={localPlayer} send={send} />
+            )}
+
+            {status === 'playing' && !isLocalPlayerTurn && (
+              <div className="mp-waiting-indicator">
+                <span className="mp-turn-label">
+                  {currentPlayerIndex >= 0 && players[currentPlayerIndex]
+                    ? `${players[currentPlayerIndex].name}'s turn`
+                    : 'Waiting…'}
+                </span>
+              </div>
+            )}
+
+            {(status === 'dealing' || status === 'dealer') && (
+              <div className="mp-waiting-indicator">
+                <span className="waiting-dots">• • •</span>
+              </div>
+            )}
+
+            {status === 'round-end' && (
+              <div className="mp-round-end">
+                <div className="mp-round-end-results">
+                  {players.map(p => {
+                    const label = resultLabel(p.result);
+                    const cls = resultClass(p.result);
+                    const splitLabel = resultLabel(p.splitResult);
+                    const splitCls = resultClass(p.splitResult);
+                    return (
+                      <Fragment key={p.id}>
+                        <span className="mp-round-result-name">{p.name}</span>
+                        <span className="mp-round-result-outcomes">
+                          {label
+                            ? <span className={`mp-slot-result-badge ${cls}`}>{label}</span>
+                            : <span className="mp-round-result-none">—</span>
+                          }
+                          {splitLabel && (
+                            <>
+                              <span className="mp-round-result-sep">/</span>
+                              <span className={`mp-slot-result-badge ${splitCls}`}>{splitLabel}</span>
+                            </>
+                          )}
+                        </span>
+                      </Fragment>
+                    );
+                  })}
+                </div>
+                <p className="mp-next-round-hint">Next round starting automatically…</p>
+              </div>
+            )}
+            </>
           )}
           </div>{/* controls-bar */}
         </div>{/* mp-center-col */}
@@ -459,6 +524,7 @@ export default function MultiplayerTable({ gameState, playerId, send, onLeave, v
               player={p}
               isLocal={p.id === playerId}
               isActive={status === 'playing' && currentPlayerIndex === i}
+              isPlayerHost={p.id === hostId}
             />
           ))}
         </aside>

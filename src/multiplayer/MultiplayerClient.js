@@ -70,6 +70,20 @@ export default function MultiplayerClient({ onLeave, volumeOn }) {
       if (state.status === 'waiting') setView('waiting');
     });
 
+    on('spectator:joined', ({ state, playerId: pid }) => {
+      setPlayerId(pid);
+      playerIdRef.current = pid;
+      setGameState(state);
+      setLobbyError(null);
+      setIsConnecting(false);
+      setView('game');
+    });
+
+    on('lobby:reset', ({ state }) => {
+      setGameState(state);
+      setView('waiting');
+    });
+
     on('game:started', ({ state }) => {
       setGameState(state);
       setView('game');
@@ -111,6 +125,14 @@ export default function MultiplayerClient({ onLeave, volumeOn }) {
     send({ type: 'lobby:start' });
   }, [send]);
 
+  const handleSettingChange = useCallback((key, value) => {
+    send({ type: 'lobby:setting', key, value });
+  }, [send]);
+
+  const handleApproveJoin = useCallback((targetId) => send({ type: 'host:approve-join', targetId }), [send]);
+  const handleRemoveSpectator = useCallback((targetId) => send({ type: 'host:remove-spectator', targetId }), [send]);
+  const handleResetLobby = useCallback(() => send({ type: 'lobby:reset' }), [send]);
+
   const handleLeaveToLobby = useCallback(() => {
     disconnect();
     setGameState(null);
@@ -150,6 +172,7 @@ export default function MultiplayerClient({ onLeave, volumeOn }) {
         playerId={playerId}
         onStart={handleStartGame}
         onLeave={handleLeaveToLobby}
+        onSettingChange={handleSettingChange}
       />
     );
   }
@@ -161,6 +184,9 @@ export default function MultiplayerClient({ onLeave, volumeOn }) {
       send={send}
       onLeave={handleLeaveToLobby}
       volumeOn={volumeOn}
+      onApproveJoin={handleApproveJoin}
+      onRemoveSpectator={handleRemoveSpectator}
+      onResetLobby={handleResetLobby}
     />
   );
 }

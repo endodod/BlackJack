@@ -105,16 +105,6 @@ export default function GameClient({ initialStats }) {
     }
   }, [])
 
-  // Multiplayer mode — completely isolated from singleplayer state
-  if (mode === 'multiplayer') {
-    return (
-      <MultiplayerClient
-        onLeave={() => setMode('singleplayer')}
-        volumeOn={volumeOn}
-      />
-    )
-  }
-
   // Fallback while session or stats are still resolving (should be near-instant with server prefetch)
   if (status === 'loading' || (status === 'authenticated' && dbStats === undefined)) {
     return <div style={{ background: '#08080e', minHeight: '100vh' }} />
@@ -126,24 +116,36 @@ export default function GameClient({ initialStats }) {
     ? { hands: dbStats.hands, wins: dbStats.wins, losses: dbStats.losses, pushes: dbStats.pushes, totalIncome: dbStats.totalIncome ?? 0, blackjacks: dbStats.blackjacks ?? 0, trainingHands: dbStats.trainingHands ?? 0, trainingCorrect: dbStats.trainingCorrect ?? 0 }
     : { hands: 0, wins: 0, losses: 0, pushes: 0, totalIncome: 0, blackjacks: 0, trainingHands: 0, trainingCorrect: 0 }
 
+  const isMultiplayer = mode === 'multiplayer'
+
   return (
     <>
-      {showModal && (
+      {showModal && !isMultiplayer && (
         <AuthModal onClose={() => setModalDismissed(true)} onGuest={() => setGuestMode(true)} />
       )}
-      <DeckProvider key={userId ?? 'guest'} initialBankroll={initialBankroll}>
-        <App
-          initialStats={gameStats}
-          onRoundEnd={handleRoundEnd}
-          onReset={handleReset}
-          onShowAuth={openAuthModal}
-          volumeOn={volumeOn}
-          onVolumeChange={handleVolumeChange}
-          volumeLevel={volumeLevel}
-          onVolumeLevelChange={handleVolumeLevelChange}
-          onSwitchToMultiplayer={() => setMode('multiplayer')}
-        />
-      </DeckProvider>
+      <div style={isMultiplayer ? { pointerEvents: 'none', userSelect: 'none' } : {}}>
+        <DeckProvider key={userId ?? 'guest'} initialBankroll={initialBankroll}>
+          <App
+            initialStats={gameStats}
+            onRoundEnd={handleRoundEnd}
+            onReset={handleReset}
+            onShowAuth={openAuthModal}
+            volumeOn={volumeOn}
+            onVolumeChange={handleVolumeChange}
+            volumeLevel={volumeLevel}
+            onVolumeLevelChange={handleVolumeLevelChange}
+            onSwitchToMultiplayer={() => setMode('multiplayer')}
+          />
+        </DeckProvider>
+      </div>
+      {isMultiplayer && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 100 }}>
+          <MultiplayerClient
+            onLeave={() => setMode('singleplayer')}
+            volumeOn={volumeOn}
+          />
+        </div>
+      )}
     </>
   )
 }

@@ -15,8 +15,8 @@ export default function MultiplayerLobby({ playerName, onCreate, onJoin, onBack,
   };
 
   return (
-    <div className="mp-screen">
-      <div className="mp-lobby-card">
+    <div className="mp-modal-backdrop" onClick={onBack}>
+      <div className="mp-lobby-card" onClick={e => e.stopPropagation()}>
         <div className="mp-lobby-header">
           <h1 className="mp-title">Multiplayer</h1>
           <p className="mp-subtitle">Play with up to 5 players</p>
@@ -85,9 +85,6 @@ export default function MultiplayerLobby({ playerName, onCreate, onJoin, onBack,
 
         {error && <div className="mp-error-msg">{error}</div>}
 
-        <button className="mp-back-btn" onClick={onBack}>
-          ← Back to Singleplayer
-        </button>
       </div>
     </div>
   );
