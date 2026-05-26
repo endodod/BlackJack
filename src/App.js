@@ -17,7 +17,7 @@ import Link from 'next/link';
 
 // gamePhase values: 'betting' | 'dealing' | 'player' | 'dealer' | 'pausing' | 'result'
 
-function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIncome: 0, blackjacks: 0, trainingHands: 0, trainingCorrect: 0 }, onRoundEnd, onReset, onShowAuth, volumeOn, onVolumeChange, volumeLevel = 1, onVolumeLevelChange, onSwitchToMultiplayer }) {
+function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIncome: 0, blackjacks: 0, trainingHands: 0, trainingCorrect: 0 }, onRoundEnd, onReset, onShowAuth, volumeOn, onVolumeChange, volumeLevel = 1, onVolumeLevelChange, rebetEnabled = true, onRebetChange, onSwitchToMultiplayer }) {
   const { data: session } = useSession();
 
   // ── UI-only state ────────────────────────────────────────────────────────────
@@ -210,6 +210,15 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
                     }}
                   />
                 </div>
+                <div className="menu-row">
+                  <span className="menu-label">Auto-Rebet</span>
+                  <button
+                    className={`menu-toggle${rebetEnabled ? ' menu-toggle-on' : ''}`}
+                    onClick={() => onRebetChange?.(!rebetEnabled)}
+                  >
+                    {rebetEnabled ? 'ON' : 'OFF'}
+                  </button>
+                </div>
                 {session?.user?.username && (
                   <Link
                     href="/profile"
@@ -373,7 +382,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
                   onDealerSelect={setTestDealerHand}
                 />
               )}
-              <BettingPanel onDeal={dealCards} defaultBet={lastBetAmount} />
+              <BettingPanel onDeal={dealCards} defaultBet={rebetEnabled ? lastBetAmount : 0} />
             </div>
           )}
           {gamePhase === 'player' && !statusMessage && (

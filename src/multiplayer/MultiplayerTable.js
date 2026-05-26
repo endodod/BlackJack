@@ -200,8 +200,8 @@ function LocalPlayerHand({ player, status }) {
 
 // ── Betting panel ─────────────────────────────────────────────────────────────
 
-function BettingPanel({ bankroll, onBet }) {
-  const [betAmount, setBetAmount] = useState(0);
+function BettingPanel({ bankroll, onBet, defaultBet = 0 }) {
+  const [betAmount, setBetAmount] = useState(() => defaultBet <= bankroll ? defaultBet : 0);
 
   const handleQuickBet = (amount) => {
     if (betAmount + amount <= bankroll) { setBetAmount(prev => prev + amount); playSound('chip'); }
@@ -269,8 +269,9 @@ function ActionButtons({ player, send }) {
 
 // ── Main table component ──────────────────────────────────────────────────────
 
-export default function MultiplayerTable({ gameState, playerId, send, onLeave, volumeOn, onApproveJoin, onRemoveSpectator, onResetLobby }) {
+export default function MultiplayerTable({ gameState, playerId, send, onLeave, volumeOn, onVolumeChange, volumeLevel = 1, onVolumeLevelChange, rebetEnabled = true, onRebetChange, onApproveJoin, onRemoveSpectator, onResetLobby }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [lastBetAmount, setLastBetAmount] = useState(0);
   const menuRef = useRef(null);
 
   const { players = [], dealerHand = [], dealerHoleHidden, currentPlayerIndex, status, code, round, hostId, spectators: spectatorsList = [], allowRejoinAfterBankrupt = true } = gameState || {};
@@ -319,7 +320,10 @@ export default function MultiplayerTable({ gameState, playerId, send, onLeave, v
     return () => document.removeEventListener('mousedown', handler);
   }, [menuOpen]);
 
-  const handleBet = useCallback((amount) => send({ type: 'player:bet', amount }), [send]);
+  const handleBet = useCallback((amount) => {
+    setLastBetAmount(amount);
+    send({ type: 'player:bet', amount });
+  }, [send]);
 
   if (!gameState) return null;
 
@@ -350,7 +354,31 @@ export default function MultiplayerTable({ gameState, playerId, send, onLeave, v
             </button>
             {menuOpen && (
               <div className="menu-panel">
-                <button className="menu-logout-btn" onClick={() => { setMenuOpen(false); onLeave(); }}>Leave Game</button>
+                <div className="menu-row menu-volume-slider-row">
+                  <span className="menu-label">Volume</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={volumeLevel}
+                    className="menu-volume-slider"
+                    onChange={e => {
+                      const val = parseFloat(e.target.value);
+                      onVolumeLevelChange?.(val);
+                      onVolumeChange?.(val > 0);
+                    }}
+                  />
+                </div>
+                <div className="menu-row">
+                  <span className="menu-label">Auto-Rebet</span>
+                  <button
+                    className={`menu-toggle${rebetEnabled ? ' menu-toggle-on' : ''}`}
+                    onClick={() => onRebetChange?.(!rebetEnabled)}
+                  >
+                    {rebetEnabled ? 'ON' : 'OFF'}
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -446,6 +474,10 @@ export default function MultiplayerTable({ gameState, playerId, send, onLeave, v
               )}
             </>
           )}
+
+          <button className="mp-host-btn mp-leave-btn" onClick={onLeave}>
+            Leave Game
+          </button>
         </aside>
 
         {/* ── Center: table + controls ── */}
@@ -486,7 +518,7 @@ export default function MultiplayerTable({ gameState, playerId, send, onLeave, v
             <>
             {isLocalBetting && (
               <div className="betting-controls">
-                <BettingPanel bankroll={localPlayer.bankroll} onBet={handleBet} />
+                <BettingPanel bankroll={localPlayer.bankroll} onBet={handleBet} defaultBet={rebetEnabled ? lastBetAmount : 0} />
               </div>
             )}
 

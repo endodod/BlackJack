@@ -1119,6 +1119,10 @@
   color: #f87171;
 }
 
+.mp-leave-btn {
+  margin-top: auto;
+}
+
 /* ── Spectators list ──────────────────────────────────── */
 
 .mp-sidebar-spectators {

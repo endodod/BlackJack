@@ -13,6 +13,7 @@ export default function GameClient({ initialStats }) {
   const [modalDismissed, setModalDismissed] = useState(false)
   const [volumeOn, setVolumeOn] = useState(true)
   const [volumeLevel, setVolLevel] = useState(1)
+  const [rebetEnabled, setRebetEnabled] = useState(true)
   const [userId, setUserId] = useState(session?.user?.id ?? null)
   const [dbStats, setDbStats] = useState(initialStats !== undefined ? initialStats : undefined)
   const saveTimer = useRef(null)
@@ -29,6 +30,10 @@ export default function GameClient({ initialStats }) {
       const storedLevel = localStorage.getItem('volumeLevel')
       if (storedLevel !== null) {
         setVolLevel(parseFloat(storedLevel))
+      }
+      const storedRebet = localStorage.getItem('rebetEnabled')
+      if (storedRebet !== null) {
+        setRebetEnabled(storedRebet === 'true')
       }
     }
   }, [])
@@ -105,6 +110,13 @@ export default function GameClient({ initialStats }) {
     }
   }, [])
 
+  const handleRebetChange = useCallback((val) => {
+    setRebetEnabled(val)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('rebetEnabled', val.toString())
+    }
+  }, [])
+
   // Fallback while session or stats are still resolving (should be near-instant with server prefetch)
   if (status === 'loading' || (status === 'authenticated' && dbStats === undefined)) {
     return <div style={{ background: '#08080e', minHeight: '100vh' }} />
@@ -134,6 +146,8 @@ export default function GameClient({ initialStats }) {
             onVolumeChange={handleVolumeChange}
             volumeLevel={volumeLevel}
             onVolumeLevelChange={handleVolumeLevelChange}
+            rebetEnabled={rebetEnabled}
+            onRebetChange={handleRebetChange}
             onSwitchToMultiplayer={() => setMode('multiplayer')}
           />
         </DeckProvider>
@@ -143,6 +157,11 @@ export default function GameClient({ initialStats }) {
           <MultiplayerClient
             onLeave={() => setMode('singleplayer')}
             volumeOn={volumeOn}
+            onVolumeChange={handleVolumeChange}
+            volumeLevel={volumeLevel}
+            onVolumeLevelChange={handleVolumeLevelChange}
+            rebetEnabled={rebetEnabled}
+            onRebetChange={handleRebetChange}
           />
         </div>
       )}

@@ -5,6 +5,7 @@ import { useMultiplayerSocket } from './useMultiplayerSocket';
 import MultiplayerLobby from './MultiplayerLobby';
 import MultiplayerWaiting from './MultiplayerWaiting';
 import MultiplayerTable from './MultiplayerTable';
+import { playSound, setVolumeEnabled, setVolumeLevel as applyVolumeLevel } from '../lib/sound';
 import './Multiplayer.css';
 
 function generateGuestName() {
@@ -29,7 +30,7 @@ function generateLobbyCode() {
  *   'waiting' → waiting room (players joining, host starts)
  *   'game'    → the actual game table
  */
-export default function MultiplayerClient({ onLeave, volumeOn }) {
+export default function MultiplayerClient({ onLeave, volumeOn, onVolumeChange, volumeLevel = 1, onVolumeLevelChange, rebetEnabled, onRebetChange }) {
   const { data: session, status: authStatus } = useSession();
   const playerName = useMemo(() => {
     if (authStatus === 'authenticated' && session?.user?.username) return session.user.username;
@@ -42,6 +43,10 @@ export default function MultiplayerClient({ onLeave, volumeOn }) {
   const [lobbyError, setLobbyError] = useState(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const playerIdRef = useRef(null);
+  const prevDealerLenRef = useRef(0);
+
+  useEffect(() => { setVolumeEnabled(volumeOn); }, [volumeOn]);
+  useEffect(() => { applyVolumeLevel(volumeLevel); }, [volumeLevel]);
 
   // Register all server→client event handlers once on mount
   useEffect(() => {
@@ -85,17 +90,47 @@ export default function MultiplayerClient({ onLeave, volumeOn }) {
     });
 
     on('game:started', ({ state }) => {
+      playSound('shuffle');
+      prevDealerLenRef.current = 0;
       setGameState(state);
       setView('game');
     });
 
-    on('game:dealt', ({ state }) => setGameState(state));
-    on('game:state', ({ state }) => setGameState(state));
-    on('game:dealer-play', ({ state }) => setGameState(state));
-    on('game:round-end', ({ state }) => {
+    on('game:dealt', ({ state }) => {
+      [650, 1300, 1950, 2600].forEach(ms => setTimeout(() => playSound('draw'), ms));
+      prevDealerLenRef.current = state.dealerHand?.length ?? 0;
       setGameState(state);
     });
-    on('game:new-round', ({ state }) => setGameState(state));
+
+    on('game:state', ({ state }) => {
+      prevDealerLenRef.current = state.dealerHand?.length ?? 0;
+      setGameState(state);
+    });
+
+    on('game:dealer-play', ({ state }) => {
+      const newLen = state.dealerHand?.length ?? 0;
+      const added = Math.max(0, newLen - prevDealerLenRef.current);
+      for (let i = 0; i < added; i++) setTimeout(() => playSound('draw'), i * 400);
+      prevDealerLenRef.current = newLen;
+      setGameState(state);
+    });
+
+    on('game:round-end', ({ state }) => {
+      const local = state.players?.find(p => p.id === playerIdRef.current);
+      if (local?.result) {
+        const r = local.result;
+        if (r === 'Player Wins' || r === 'Blackjack!') playSound('win');
+        else if (r === 'Push') playSound('push');
+        else playSound('bust');
+      }
+      prevDealerLenRef.current = 0;
+      setGameState(state);
+    });
+
+    on('game:new-round', ({ state }) => {
+      prevDealerLenRef.current = 0;
+      setGameState(state);
+    });
 
     on('error', ({ message }) => {
       setLobbyError(message);
@@ -184,6 +219,11 @@ export default function MultiplayerClient({ onLeave, volumeOn }) {
       send={send}
       onLeave={handleLeaveToLobby}
       volumeOn={volumeOn}
+      onVolumeChange={onVolumeChange}
+      volumeLevel={volumeLevel}
+      onVolumeLevelChange={onVolumeLevelChange}
+      rebetEnabled={rebetEnabled}
+      onRebetChange={onRebetChange}
       onApproveJoin={handleApproveJoin}
       onRemoveSpectator={handleRemoveSpectator}
       onResetLobby={handleResetLobby}
