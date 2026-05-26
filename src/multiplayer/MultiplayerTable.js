@@ -514,7 +514,7 @@ export default function MultiplayerTable({ gameState, playerId, send, onLeave, v
           {isSpectating ? (
             <div className="mp-spectating-overlay">
               {localSpectator?.joinType === 'bankrupt' && (
-                <p className="mp-spectating-title">You're out of chips</p>
+                <p className="mp-spectating-title">You&apos;re out of chips</p>
               )}
               {localSpectator?.approvedToJoin
                 ? <p className="mp-spectating-approved">{localSpectator.joinType === 'bankrupt' ? 'You\'re back in next round!' : 'Approved — joining next round!'}</p>
