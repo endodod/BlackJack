@@ -445,7 +445,10 @@ export default function MultiplayerTable({ gameState, playerId, send, onLeave, v
           {isSpectating ? (
             <div className="mp-spectating-overlay">
               <p className="mp-spectating-title">You're out of chips</p>
-              <p className="mp-spectating-hint">Waiting for the host to let you back in…</p>
+              {localSpectator?.approvedToJoin
+                ? <p className="mp-spectating-approved">You're back in next round!</p>
+                : <p className="mp-spectating-hint">Waiting for the host to let you back in…</p>
+              }
             </div>
           ) : (
             <>

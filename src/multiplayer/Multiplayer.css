@@ -1073,6 +1073,13 @@
   animation: waitingPulse 1.4s ease-in-out infinite;
 }
 
+.mp-spectating-approved {
+  margin: 0;
+  font-size: 0.85em;
+  font-weight: 700;
+  color: #22c55e;
+}
+
 /* ── Host controls sidebar section ───────────────────── */
 
 .mp-sidebar-host-controls {
