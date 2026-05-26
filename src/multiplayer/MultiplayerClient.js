@@ -80,10 +80,6 @@ export default function MultiplayerClient({ onLeave, volumeOn }) {
     on('game:dealer-play', ({ state }) => setGameState(state));
     on('game:round-end', ({ state }) => {
       setGameState(state);
-      const me = state.players.find(p => p.id === playerIdRef.current);
-      if (me?.forcedReset) {
-        fetch('/api/user/track-reset', { method: 'POST' });
-      }
     });
     on('game:new-round', ({ state }) => setGameState(state));
 

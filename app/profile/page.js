@@ -111,7 +111,7 @@ export default function ProfilePage() {
 
         {/* Stats */}
         <section className="profile-section">
-          <h2 className="profile-section-title">Stats</h2>
+          <h2 className="profile-section-title">Singleplayer Statistics</h2>
           <div className="profile-stats-grid">
             <div className="profile-stat">
               <span className="profile-stat-label">Bankroll</span>
