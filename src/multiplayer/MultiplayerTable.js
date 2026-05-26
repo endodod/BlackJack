@@ -274,7 +274,7 @@ export default function MultiplayerTable({ gameState, playerId, send, onLeave, v
   const [lastBetAmount, setLastBetAmount] = useState(0);
   const menuRef = useRef(null);
 
-  const { players = [], dealerHand = [], dealerHoleHidden, currentPlayerIndex, status, code, round, hostId, spectators: spectatorsList = [], allowRejoinAfterBankrupt = true } = gameState || {};
+  const { players = [], dealerHand = [], dealerHoleHidden, currentPlayerIndex, status, code, round, hostId, spectators: spectatorsList = [], allowRejoinAfterBankrupt = true, gameMode = 'freeplay', roundLimit = 5, targetBankroll = 5000 } = gameState || {};
 
   const localPlayer = players.find(p => p.id === playerId);
   const localPlayerIndex = players.findIndex(p => p.id === playerId);
@@ -392,7 +392,18 @@ export default function MultiplayerTable({ gameState, playerId, send, onLeave, v
           <div className="mp-sidebar-section">
             <span className="mp-sidebar-label">Lobby</span>
             <div className="mp-sidebar-code">{code}</div>
-            <span className="mp-sidebar-round">Round {round}</span>
+            {gameMode === 'highest-bankroll' && (
+              <span className="mp-sidebar-round">Round {round} / {roundLimit}</span>
+            )}
+            {gameMode === 'target-bankroll' && (
+              <>
+                <span className="mp-sidebar-round">Round {round}</span>
+                <span className="mp-sidebar-objective">Target ${targetBankroll.toLocaleString()}</span>
+              </>
+            )}
+            {gameMode === 'freeplay' && (
+              <span className="mp-sidebar-round">Round {round}</span>
+            )}
           </div>
 
           <div className="mp-sidebar-divider" />

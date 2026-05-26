@@ -4,10 +4,24 @@ import { useState, useEffect } from 'react';
 export default function MultiplayerWaiting({ gameState, playerId, onStart, onLeave, onSettingChange }) {
   if (!gameState) return null;
 
-  const { code, players, hostId, startingBalance = 1000, allowMidGameJoin = false, allowRejoinAfterBankrupt = false } = gameState;
+  const {
+    code, players, hostId,
+    startingBalance = 1000,
+    allowMidGameJoin = false,
+    allowRejoinAfterBankrupt = false,
+    gameMode = 'freeplay',
+    roundLimit = 5,
+    targetBankroll = 5000,
+  } = gameState;
+
   const isHost = hostId === playerId;
   const canStart = isHost && players.length >= 2;
   const emptySeats = 5 - players.length;
+
+  const gameModeLabel =
+    gameMode === 'highest-bankroll' ? `Highest Bankroll (${roundLimit} rounds)` :
+    gameMode === 'target-bankroll'  ? `Target $${targetBankroll.toLocaleString()}` :
+    'Freeplay';
 
   return (
     <div className="mp-screen">
@@ -20,8 +34,10 @@ export default function MultiplayerWaiting({ gameState, playerId, onStart, onLea
           <span className="mp-code-hint">Share this with friends</span>
         </div>
 
+        {/* ── Two-column main area ── */}
         <div className="mp-waiting-main">
-          {/* ── Player list ── */}
+
+          {/* Player list */}
           <div className="mp-player-list">
             <div className="mp-player-list-label">Players ({players.length}/5)</div>
 
@@ -35,12 +51,7 @@ export default function MultiplayerWaiting({ gameState, playerId, onStart, onLea
                   {p.id === playerId && <span className="mp-me-badge">YOU</span>}
                 </span>
                 {isHost && p.isBot ? (
-                  <button
-                    className="mp-bot-remove-btn"
-                    onClick={() => onSettingChange('removeBot', p.id)}
-                  >
-                    ×
-                  </button>
+                  <button className="mp-bot-remove-btn" onClick={() => onSettingChange('removeBot', p.id)}>×</button>
                 ) : (
                   !p.isBot && <span className="mp-player-ready">Ready</span>
                 )}
@@ -66,29 +77,15 @@ export default function MultiplayerWaiting({ gameState, playerId, onStart, onLea
             ))}
           </div>
 
-          {/* ── Right column: settings + start ── */}
+          {/* Right column: lobby settings */}
           <div className="mp-waiting-side">
             {isHost ? (
-              <>
-                <LobbySettings
-                  startingBalance={startingBalance}
-                  allowMidGameJoin={allowMidGameJoin}
-                  allowRejoinAfterBankrupt={allowRejoinAfterBankrupt}
-                  onSettingChange={onSettingChange}
-                />
-                <div className="mp-start-area">
-                  {players.length < 2 && (
-                    <p className="mp-start-hint">Need at least 2 players (or bots) to start.</p>
-                  )}
-                  <button
-                    className="mp-primary-btn"
-                    disabled={!canStart}
-                    onClick={onStart}
-                  >
-                    Start Game →
-                  </button>
-                </div>
-              </>
+              <LobbySettings
+                startingBalance={startingBalance}
+                allowMidGameJoin={allowMidGameJoin}
+                allowRejoinAfterBankrupt={allowRejoinAfterBankrupt}
+                onSettingChange={onSettingChange}
+              />
             ) : (
               <>
                 <div className="mp-settings-section">
@@ -96,6 +93,10 @@ export default function MultiplayerWaiting({ gameState, playerId, onStart, onLea
                   <div className="mp-setting-row">
                     <span className="mp-setting-label">Starting Balance</span>
                     <span className="mp-setting-value">${startingBalance.toLocaleString()}</span>
+                  </div>
+                  <div className="mp-setting-row">
+                    <span className="mp-setting-label">Game Mode</span>
+                    <span className="mp-setting-value">{gameModeLabel}</span>
                   </div>
                   <div className="mp-setting-row">
                     <span className="mp-setting-label">In-progress Join</span>
@@ -112,6 +113,26 @@ export default function MultiplayerWaiting({ gameState, playerId, onStart, onLea
           </div>
         </div>
 
+        {/* ── Bottom row: game mode (left) + start button (right) ── */}
+        {isHost && (
+          <div className="mp-waiting-bottom">
+            <GameModeSettings
+              gameMode={gameMode}
+              roundLimit={roundLimit}
+              targetBankroll={targetBankroll}
+              onSettingChange={onSettingChange}
+            />
+            <div className="mp-start-area">
+              {players.length < 2 && (
+                <p className="mp-start-hint">Need at least 2 players (or bots) to start.</p>
+              )}
+              <button className="mp-primary-btn" disabled={!canStart} onClick={onStart}>
+                Start Game →
+              </button>
+            </div>
+          </div>
+        )}
+
         <button className="mp-back-btn mp-back-btn-sm" onClick={onLeave}>
           Leave Lobby
         </button>
@@ -121,17 +142,13 @@ export default function MultiplayerWaiting({ gameState, playerId, onStart, onLea
 }
 
 function LobbySettings({ startingBalance, allowMidGameJoin, allowRejoinAfterBankrupt, onSettingChange }) {
-  const [value, setValue] = useState(startingBalance);
+  const [balanceVal, setBalanceVal] = useState(startingBalance);
+  useEffect(() => { setBalanceVal(startingBalance); }, [startingBalance]);
 
-  useEffect(() => { setValue(startingBalance); }, [startingBalance]);
-
-  const commit = () => {
-    const n = parseInt(value, 10);
-    if (!isNaN(n) && n >= 1) {
-      onSettingChange('startingBalance', n);
-    } else {
-      setValue(startingBalance);
-    }
+  const commitBalance = () => {
+    const n = parseInt(balanceVal, 10);
+    if (!isNaN(n) && n >= 1) onSettingChange('startingBalance', n);
+    else setBalanceVal(startingBalance);
   };
 
   return (
@@ -146,9 +163,9 @@ function LobbySettings({ startingBalance, allowMidGameJoin, allowRejoinAfterBank
             className="mp-input mp-input-balance"
             type="number"
             min={1}
-            value={value}
-            onChange={e => setValue(e.target.value)}
-            onBlur={commit}
+            value={balanceVal}
+            onChange={e => setBalanceVal(e.target.value)}
+            onBlur={commitBalance}
             onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
           />
         </div>
@@ -171,6 +188,84 @@ function LobbySettings({ startingBalance, allowMidGameJoin, allowRejoinAfterBank
           {allowRejoinAfterBankrupt ? 'On' : 'Off'}
         </button>
       </div>
+    </div>
+  );
+}
+
+function GameModeSettings({ gameMode, roundLimit, targetBankroll, onSettingChange }) {
+  const [roundVal, setRoundVal] = useState(roundLimit);
+  const [targetVal, setTargetVal] = useState(targetBankroll);
+
+  useEffect(() => { setRoundVal(roundLimit); }, [roundLimit]);
+  useEffect(() => { setTargetVal(targetBankroll); }, [targetBankroll]);
+
+  const commitRound = () => {
+    const n = parseInt(roundVal, 10);
+    if (!isNaN(n) && n >= 1) onSettingChange('roundLimit', n);
+    else setRoundVal(roundLimit);
+  };
+
+  const commitTarget = () => {
+    const n = parseInt(targetVal, 10);
+    if (!isNaN(n) && n >= 1) onSettingChange('targetBankroll', n);
+    else setTargetVal(targetBankroll);
+  };
+
+  return (
+    <div className="mp-gamemode-section">
+      <div className="mp-setting-row">
+        <span className="mp-setting-label">Game Mode</span>
+        <div className="mp-setting-chips">
+          {[
+            { value: 'freeplay',         label: 'Freeplay' },
+            { value: 'highest-bankroll', label: 'Highest Bankroll' },
+            { value: 'target-bankroll',  label: 'Target Bankroll' },
+          ].map(opt => (
+            <button
+              key={opt.value}
+              className={`mp-setting-chip${gameMode === opt.value ? ' mp-setting-chip-active' : ''}`}
+              onClick={() => onSettingChange('gameMode', opt.value)}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {gameMode === 'highest-bankroll' && (
+        <div className="mp-setting-row mp-setting-row-sub">
+          <label className="mp-setting-label" htmlFor="mp-rounds-input">Rounds</label>
+          <input
+            id="mp-rounds-input"
+            className="mp-input mp-input-balance"
+            type="number"
+            min={1}
+            value={roundVal}
+            onChange={e => setRoundVal(e.target.value)}
+            onBlur={commitRound}
+            onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+          />
+        </div>
+      )}
+
+      {gameMode === 'target-bankroll' && (
+        <div className="mp-setting-row mp-setting-row-sub">
+          <label className="mp-setting-label" htmlFor="mp-target-input">Target</label>
+          <div className="mp-input-prefix-wrap">
+            <span className="mp-input-prefix">$</span>
+            <input
+              id="mp-target-input"
+              className="mp-input mp-input-balance"
+              type="number"
+              min={1}
+              value={targetVal}
+              onChange={e => setTargetVal(e.target.value)}
+              onBlur={commitTarget}
+              onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

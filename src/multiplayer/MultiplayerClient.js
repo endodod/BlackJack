@@ -5,6 +5,7 @@ import { useMultiplayerSocket } from './useMultiplayerSocket';
 import MultiplayerLobby from './MultiplayerLobby';
 import MultiplayerWaiting from './MultiplayerWaiting';
 import MultiplayerTable from './MultiplayerTable';
+import MultiplayerWinScreen from './MultiplayerWinScreen';
 import { playSound, setVolumeEnabled, setVolumeLevel as applyVolumeLevel } from '../lib/sound';
 import './Multiplayer.css';
 
@@ -42,6 +43,7 @@ export default function MultiplayerClient({ onLeave, volumeOn, onVolumeChange, v
   const [playerId, setPlayerId] = useState(null);
   const [lobbyError, setLobbyError] = useState(null);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [winData, setWinData] = useState(null);
   const playerIdRef = useRef(null);
   const prevDealerLenRef = useRef(0);
 
@@ -132,6 +134,13 @@ export default function MultiplayerClient({ onLeave, volumeOn, onVolumeChange, v
       setGameState(state);
     });
 
+    on('game:over', ({ winners, state }) => {
+      prevDealerLenRef.current = 0;
+      setGameState(state);
+      setWinData(winners);
+      setView('win');
+    });
+
     on('error', ({ message }) => {
       setLobbyError(message);
       setIsConnecting(false);
@@ -214,6 +223,18 @@ export default function MultiplayerClient({ onLeave, volumeOn, onVolumeChange, v
         onStart={handleStartGame}
         onLeave={handleLeaveToLobby}
         onSettingChange={handleSettingChange}
+      />
+    );
+  }
+
+  if (view === 'win') {
+    return (
+      <MultiplayerWinScreen
+        gameState={gameState}
+        playerId={playerId}
+        winData={winData}
+        onContinue={() => send({ type: 'game:continue' })}
+        onLeave={handleLeaveToLobby}
       />
     );
   }

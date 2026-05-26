@@ -165,6 +165,10 @@ export default class BlackjackParty {
     this.startingBalance = 1000;
     this.allowMidGameJoin = false;
     this.allowRejoinAfterBankrupt = false;
+    this.gameMode = 'freeplay'; // 'freeplay' | 'highest-bankroll' | 'target-bankroll'
+    this.roundLimit = 5;
+    this.targetBankroll = 5000;
+    this.continueReadySet = new Set();
     this.deck = createShoe();
     this.dealerHand = [];
     this.dealerHoleHidden = true;
@@ -256,6 +260,10 @@ export default class BlackjackParty {
       })),
       allowMidGameJoin: this.allowMidGameJoin,
       allowRejoinAfterBankrupt: this.allowRejoinAfterBankrupt,
+      gameMode: this.gameMode,
+      roundLimit: this.roundLimit,
+      targetBankroll: this.targetBankroll,
+      continueReady: [...this.continueReadySet],
       dealerHand: this.dealerHand,
       dealerHoleHidden: this.dealerHoleHidden,
       currentPlayerIndex: this.currentPlayerIndex,
@@ -268,7 +276,23 @@ export default class BlackjackParty {
   }
 
   // Reset game to waiting state, merging all spectators back as players
+  resetPlayerGameState(p) {
+    p.bet = 0;
+    p.hand = [];
+    p.splitHand = null;
+    p.hand1Completed = null;
+    p.hand1Bet = 0;
+    p.splitBet = 0;
+    p.handStatus = 'betting';
+    p.result = null;
+    p.splitResult = null;
+    p.resultAmount = 0;
+    p.splitResultAmount = 0;
+  }
+
   doReset() {
+    this.continueReadySet.clear();
+    for (const p of this.players) this.resetPlayerGameState(p);
     for (const s of this.spectators) {
       const p = this.makePlayer(s.id, s.name);
       p.bankroll = this.startingBalance;
@@ -366,6 +390,15 @@ export default class BlackjackParty {
       if (msg.key === 'allowRejoinAfterBankrupt' && typeof msg.value === 'boolean') {
         this.allowRejoinAfterBankrupt = msg.value; changed = true;
       }
+      if (msg.key === 'gameMode' && ['freeplay', 'highest-bankroll', 'target-bankroll'].includes(msg.value)) {
+        this.gameMode = msg.value; changed = true;
+      }
+      if (msg.key === 'roundLimit' && Number.isInteger(msg.value) && msg.value >= 1) {
+        this.roundLimit = msg.value; changed = true;
+      }
+      if (msg.key === 'targetBankroll' && Number.isInteger(msg.value) && msg.value >= 1) {
+        this.targetBankroll = msg.value; changed = true;
+      }
       if (changed) this.broadcast({ type: 'lobby:update', state: this.publicState() });
       return;
     }
@@ -404,7 +437,13 @@ export default class BlackjackParty {
         return;
       }
       if (this.status !== 'waiting') return;
-      for (const p of this.players) p.bankroll = this.startingBalance;
+      for (const p of this.players) {
+        this.resetPlayerGameState(p);
+        p.bankroll = this.startingBalance;
+      }
+      this.dealerHand = [];
+      this.dealerHoleHidden = true;
+      this.currentPlayerIndex = -1;
       this.status = 'betting';
       this.round = 1;
       this.broadcast({ type: 'game:started', state: this.publicState() });
@@ -417,6 +456,23 @@ export default class BlackjackParty {
       if (this.hostId !== sender.id) return;
       if (this.status === 'waiting') return;
       this.doReset();
+      return;
+    }
+
+    // ── Player continue on end screen ─────────────────────────────────────────
+    if (type === 'game:continue') {
+      if (this.status !== 'game-over') return;
+      if (!this.players.find(p => p.id === sender.id)) return;
+      this.continueReadySet.add(sender.id);
+      // Bots are auto-readied
+      for (const p of this.players) {
+        if (p.isBot) this.continueReadySet.add(p.id);
+      }
+      this.broadcast({ type: 'game:state', state: this.publicState() });
+      if (this.players.every(p => this.continueReadySet.has(p.id))) {
+        this.continueReadySet.clear();
+        this.doReset();
+      }
       return;
     }
 
@@ -691,6 +747,18 @@ export default class BlackjackParty {
         return;
       }
 
+      // Check win condition
+      const winners = this.checkWinCondition();
+      if (winners) {
+        this.status = 'game-over';
+        this.broadcast({
+          type: 'game:over',
+          winners: winners.map(w => ({ id: w.id, name: w.name, bankroll: w.bankroll })),
+          state: this.publicState(),
+        });
+        return;
+      }
+
       this.startNewRound();
     }, 5000);
   }
@@ -731,6 +799,8 @@ export default class BlackjackParty {
 
   dealCards() {
     this.status = 'dealing';
+    for (const p of this.players) { p.hand = []; p.splitHand = null; }
+    this.dealerHand = [];
     const n = this.players.length;
     for (let i = n - 1; i >= 0; i--) this.players[i].hand.push(this.deck.shift());
     this.dealerHand.push(this.deck.shift());
@@ -795,6 +865,22 @@ export default class BlackjackParty {
         this.advanceToNextPlayer();
       }, status === 'busted' ? 1200 : 300);
     }
+  }
+
+  checkWinCondition() {
+    if (this.players.length === 0) return null;
+
+    if (this.gameMode === 'target-bankroll') {
+      const winners = this.players.filter(p => p.bankroll >= this.targetBankroll);
+      if (winners.length > 0) return winners;
+    }
+
+    if (this.gameMode === 'highest-bankroll' && this.round >= this.roundLimit) {
+      const max = Math.max(...this.players.map(p => p.bankroll));
+      return this.players.filter(p => p.bankroll === max);
+    }
+
+    return null;
   }
 
   // ── Bot automation ─────────────────────────────────────────────────────────
