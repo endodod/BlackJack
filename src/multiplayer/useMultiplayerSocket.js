@@ -37,8 +37,9 @@ export function useMultiplayerSocket() {
     wsRef.current = ws;
 
     ws.addEventListener('open', () => { setConnected(true); setError(null); });
-    ws.addEventListener('close', () => { setConnected(false); });
+    ws.addEventListener('close', () => { if (wsRef.current === ws) setConnected(false); });
     ws.addEventListener('error', () => {
+      if (wsRef.current !== ws) return; // intentional disconnect — ignore
       setError('Connection failed. Is the server running?');
       setConnected(false);
     });

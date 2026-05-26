@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 export default function MultiplayerWaiting({ gameState, playerId, onStart, onLeave, onSettingChange }) {
   if (!gameState) return null;
 
-  const { code, players, hostId, startingBalance = 1000 } = gameState;
+  const { code, players, hostId, startingBalance = 1000, allowMidGameJoin = true, allowRejoinAfterBankrupt = true } = gameState;
   const isHost = hostId === playerId;
   const canStart = isHost && players.length >= 2;
 
@@ -44,7 +44,12 @@ export default function MultiplayerWaiting({ gameState, playerId, onStart, onLea
 
         {isHost ? (
           <>
-            <BalanceSetting startingBalance={startingBalance} onSettingChange={onSettingChange} />
+            <LobbySettings
+              startingBalance={startingBalance}
+              allowMidGameJoin={allowMidGameJoin}
+              allowRejoinAfterBankrupt={allowRejoinAfterBankrupt}
+              onSettingChange={onSettingChange}
+            />
             <div className="mp-start-area">
               {players.length < 2 && (
                 <p className="mp-start-hint">Need at least 2 players to start.</p>
@@ -61,9 +66,18 @@ export default function MultiplayerWaiting({ gameState, playerId, onStart, onLea
         ) : (
           <>
             <div className="mp-settings-section">
+              <p className="mp-settings-title">Lobby Settings</p>
               <div className="mp-setting-row">
                 <span className="mp-setting-label">Starting Balance</span>
                 <span className="mp-setting-value">${startingBalance.toLocaleString()}</span>
+              </div>
+              <div className="mp-setting-row">
+                <span className="mp-setting-label">In-progress Join</span>
+                <span className="mp-setting-value">{allowMidGameJoin ? 'On' : 'Off'}</span>
+              </div>
+              <div className="mp-setting-row">
+                <span className="mp-setting-label">Rejoin After Bust</span>
+                <span className="mp-setting-value">{allowRejoinAfterBankrupt ? 'On' : 'Off'}</span>
               </div>
             </div>
             <p className="mp-waiting-for-host">Waiting for the host to start…</p>
@@ -78,7 +92,7 @@ export default function MultiplayerWaiting({ gameState, playerId, onStart, onLea
   );
 }
 
-function BalanceSetting({ startingBalance, onSettingChange }) {
+function LobbySettings({ startingBalance, allowMidGameJoin, allowRejoinAfterBankrupt, onSettingChange }) {
   const [value, setValue] = useState(startingBalance);
 
   useEffect(() => { setValue(startingBalance); }, [startingBalance]);
@@ -110,6 +124,24 @@ function BalanceSetting({ startingBalance, onSettingChange }) {
             onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
           />
         </div>
+      </div>
+      <div className="mp-setting-row">
+        <span className="mp-setting-label">In-progress Join</span>
+        <button
+          className={`mp-setting-chip${allowMidGameJoin ? ' mp-setting-chip-active' : ''}`}
+          onClick={() => onSettingChange('allowMidGameJoin', !allowMidGameJoin)}
+        >
+          {allowMidGameJoin ? 'On' : 'Off'}
+        </button>
+      </div>
+      <div className="mp-setting-row">
+        <span className="mp-setting-label">Rejoin After Bust</span>
+        <button
+          className={`mp-setting-chip${allowRejoinAfterBankrupt ? ' mp-setting-chip-active' : ''}`}
+          onClick={() => onSettingChange('allowRejoinAfterBankrupt', !allowRejoinAfterBankrupt)}
+        >
+          {allowRejoinAfterBankrupt ? 'On' : 'Off'}
+        </button>
       </div>
     </div>
   );

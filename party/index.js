@@ -46,6 +46,8 @@ export default class BlackjackParty {
     this.hostId = null;
     this.status = 'waiting'; // waiting | betting | playing | dealer | round-end
     this.startingBalance = 1000;
+    this.allowMidGameJoin = true;
+    this.allowRejoinAfterBankrupt = true;
     this.deck = createShoe();
     this.dealerHand = [];
     this.dealerHoleHidden = true;
@@ -90,8 +92,8 @@ export default class BlackjackParty {
     };
   }
 
-  makeSpectator(connId, name, bankroll = 0) {
-    return { id: connId, name: (name || 'Player').slice(0, 20), bankroll, approvedToJoin: false };
+  makeSpectator(connId, name, bankroll = 0, joinType = 'midgame') {
+    return { id: connId, name: (name || 'Player').slice(0, 20), bankroll, approvedToJoin: false, joinType };
   }
 
   publicState() {
@@ -121,7 +123,10 @@ export default class BlackjackParty {
         name: s.name,
         bankroll: s.bankroll,
         approvedToJoin: s.approvedToJoin,
+        joinType: s.joinType,
       })),
+      allowMidGameJoin: this.allowMidGameJoin,
+      allowRejoinAfterBankrupt: this.allowRejoinAfterBankrupt,
       dealerHand: this.dealerHand,
       dealerHoleHidden: this.dealerHoleHidden,
       currentPlayerIndex: this.currentPlayerIndex,
@@ -186,9 +191,13 @@ export default class BlackjackParty {
         sender.send(JSON.stringify({ type: 'error', message: 'Already in lobby.' }));
         return;
       }
-      // Mid-game join → spectator
+      // Mid-game join → spectator (if allowed)
       if (this.status !== 'waiting') {
-        this.spectators.push(this.makeSpectator(sender.id, msg.name, 0));
+        if (!this.allowMidGameJoin) {
+          sender.send(JSON.stringify({ type: 'error', message: 'This lobby does not allow joining a game in progress.' }));
+          return;
+        }
+        this.spectators.push(this.makeSpectator(sender.id, msg.name, 0, 'midgame'));
         sender.send(JSON.stringify({
           type: 'spectator:joined',
           state: this.publicState(),
@@ -217,10 +226,17 @@ export default class BlackjackParty {
     if (type === 'lobby:setting') {
       if (this.hostId !== sender.id) return;
       if (this.status !== 'waiting') return;
+      let changed = false;
       if (msg.key === 'startingBalance' && Number.isInteger(msg.value) && msg.value >= 1) {
-        this.startingBalance = msg.value;
-        this.broadcast({ type: 'lobby:update', state: this.publicState() });
+        this.startingBalance = msg.value; changed = true;
       }
+      if (msg.key === 'allowMidGameJoin' && typeof msg.value === 'boolean') {
+        this.allowMidGameJoin = msg.value; changed = true;
+      }
+      if (msg.key === 'allowRejoinAfterBankrupt' && typeof msg.value === 'boolean') {
+        this.allowRejoinAfterBankrupt = msg.value; changed = true;
+      }
+      if (changed) this.broadcast({ type: 'lobby:update', state: this.publicState() });
       return;
     }
 
@@ -502,7 +518,7 @@ export default class BlackjackParty {
       // Move players with bankroll < 10 to spectators
       const toSpectate = this.players.filter(p => p.bankroll < 10);
       for (const p of toSpectate) {
-        this.spectators.push(this.makeSpectator(p.id, p.name, p.bankroll));
+        this.spectators.push(this.makeSpectator(p.id, p.name, p.bankroll, 'bankrupt'));
       }
       this.players = this.players.filter(p => p.bankroll >= 10);
 

@@ -273,7 +273,7 @@ export default function MultiplayerTable({ gameState, playerId, send, onLeave, v
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
-  const { players = [], dealerHand = [], dealerHoleHidden, currentPlayerIndex, status, code, round, hostId, spectators: spectatorsList = [] } = gameState || {};
+  const { players = [], dealerHand = [], dealerHoleHidden, currentPlayerIndex, status, code, round, hostId, spectators: spectatorsList = [], allowRejoinAfterBankrupt = true } = gameState || {};
 
   const localPlayer = players.find(p => p.id === playerId);
   const localPlayerIndex = players.findIndex(p => p.id === playerId);
@@ -395,19 +395,45 @@ export default function MultiplayerTable({ gameState, playerId, send, onLeave, v
                 </button>
               </div>
 
-              {spectatorsList.length > 0 && (
+              {spectatorsList.filter(s => s.joinType === 'bankrupt').length > 0 && (
+                <>
+                  <div className="mp-sidebar-divider" />
+                  <div className="mp-sidebar-section mp-sidebar-spectators">
+                    <span className="mp-sidebar-label">Busted Out</span>
+                    {spectatorsList.filter(s => s.joinType === 'bankrupt').map(s => (
+                      <div key={s.id} className="mp-spectator-row">
+                        <span className="mp-spectator-name">{s.name}</span>
+                        <div className="mp-spectator-actions">
+                          {allowRejoinAfterBankrupt && (
+                            <button
+                              className={`mp-allow-btn${s.approvedToJoin ? ' mp-allow-btn-approved' : ''}`}
+                              onClick={() => onApproveJoin(s.id)}
+                              title={s.approvedToJoin ? 'Approved for next round' : 'Allow to rejoin'}
+                            >
+                              {s.approvedToJoin ? '✓' : 'Allow'}
+                            </button>
+                          )}
+                          <button className="mp-remove-btn" onClick={() => onRemoveSpectator(s.id)} title="Remove">✕</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {spectatorsList.filter(s => s.joinType === 'midgame').length > 0 && (
                 <>
                   <div className="mp-sidebar-divider" />
                   <div className="mp-sidebar-section mp-sidebar-spectators">
                     <span className="mp-sidebar-label">Spectating</span>
-                    {spectatorsList.map(s => (
+                    {spectatorsList.filter(s => s.joinType === 'midgame').map(s => (
                       <div key={s.id} className="mp-spectator-row">
                         <span className="mp-spectator-name">{s.name}</span>
                         <div className="mp-spectator-actions">
                           <button
                             className={`mp-allow-btn${s.approvedToJoin ? ' mp-allow-btn-approved' : ''}`}
                             onClick={() => onApproveJoin(s.id)}
-                            title={s.approvedToJoin ? 'Approved for next round' : 'Allow to join next round'}
+                            title={s.approvedToJoin ? 'Approved for next round' : 'Allow to join'}
                           >
                             {s.approvedToJoin ? '✓' : 'Allow'}
                           </button>
@@ -444,10 +470,16 @@ export default function MultiplayerTable({ gameState, playerId, send, onLeave, v
           <div className="controls-bar">
           {isSpectating ? (
             <div className="mp-spectating-overlay">
-              <p className="mp-spectating-title">You're out of chips</p>
+              {localSpectator?.joinType === 'bankrupt' && (
+                <p className="mp-spectating-title">You're out of chips</p>
+              )}
               {localSpectator?.approvedToJoin
-                ? <p className="mp-spectating-approved">You're back in next round!</p>
-                : <p className="mp-spectating-hint">Waiting for the host to let you back in…</p>
+                ? <p className="mp-spectating-approved">{localSpectator.joinType === 'bankrupt' ? 'You\'re back in next round!' : 'Approved — joining next round!'}</p>
+                : localSpectator?.joinType === 'midgame'
+                  ? <p className="mp-spectating-hint">Waiting for host to approve join…</p>
+                  : (!allowRejoinAfterBankrupt)
+                    ? <p className="mp-spectating-hint">Waiting for the host to reset the game…</p>
+                    : <p className="mp-spectating-hint">Waiting for the host to let you back in…</p>
               }
             </div>
           ) : (
