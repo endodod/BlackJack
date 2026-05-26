@@ -161,7 +161,13 @@ export default function MultiplayerClient({ onLeave, volumeOn, onVolumeChange, v
   }, [send]);
 
   const handleSettingChange = useCallback((key, value) => {
-    send({ type: 'lobby:setting', key, value });
+    if (key === 'addBot') {
+      send({ type: 'lobby:add-bot', difficulty: value });
+    } else if (key === 'removeBot') {
+      send({ type: 'lobby:remove-bot', botId: value });
+    } else {
+      send({ type: 'lobby:setting', key, value });
+    }
   }, [send]);
 
   const handleApproveJoin = useCallback((targetId) => send({ type: 'host:approve-join', targetId }), [send]);

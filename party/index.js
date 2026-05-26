@@ -1,5 +1,122 @@
 import * as Party from 'partykit/server';
 
+// ── Basic Strategy tables (Multi-deck S17) ───────────────────────────────────
+// Dealer upcard columns: [2,3,4,5,6,7,8,9,10,A] → indices 0–9
+
+const BOT_HARD = {
+   5: ['H','H','H','H','H','H','H','H','H','H'],
+   6: ['H','H','H','H','H','H','H','H','H','H'],
+   7: ['H','H','H','H','H','H','H','H','H','H'],
+   8: ['H','H','H','H','H','H','H','H','H','H'],
+   9: ['H','D','D','D','D','H','H','H','H','H'],
+  10: ['D','D','D','D','D','D','D','D','H','H'],
+  11: ['D','D','D','D','D','D','D','D','D','H'],
+  12: ['H','H','S','S','S','H','H','H','H','H'],
+  13: ['S','S','S','S','S','H','H','H','H','H'],
+  14: ['S','S','S','S','S','H','H','H','H','H'],
+  15: ['S','S','S','S','S','H','H','H','Rh','H'],
+  16: ['S','S','S','S','S','H','H','Rh','Rh','Rh'],
+  17: ['S','S','S','S','S','S','S','S','S','S'],
+};
+
+const BOT_SOFT = {
+  2: ['H','H','H','D','D','H','H','H','H','H'],
+  3: ['H','H','H','D','D','H','H','H','H','H'],
+  4: ['H','H','D','D','D','H','H','H','H','H'],
+  5: ['H','H','D','D','D','H','H','H','H','H'],
+  6: ['H','D','D','D','D','H','H','H','H','H'],
+  7: ['DS','DS','DS','DS','DS','S','S','H','H','H'],
+  8: ['S','S','S','S','S','S','S','S','S','S'],
+  9: ['S','S','S','S','S','S','S','S','S','S'],
+};
+
+const BOT_PAIRS = {
+  'A':  ['P','P','P','P','P','P','P','P','P','P'],
+  '2':  ['P','P','P','P','P','P','H','H','H','H'],
+  '3':  ['P','P','P','P','P','P','H','H','H','H'],
+  '4':  ['H','H','H','P','P','H','H','H','H','H'],
+  '5':  ['D','D','D','D','D','D','D','D','H','H'],
+  '6':  ['P','P','P','P','P','H','H','H','H','H'],
+  '7':  ['P','P','P','P','P','P','H','H','H','H'],
+  '8':  ['P','P','P','P','P','P','P','P','P','P'],
+  '9':  ['P','P','P','P','P','S','P','P','S','S'],
+  '10': ['S','S','S','S','S','S','S','S','S','S'],
+};
+
+function botDealerCol(card) {
+  const v = String(card.value);
+  if (v === 'A') return 9;
+  if (['J','Q','K','10'].includes(v)) return 8;
+  return Number(v) - 2;
+}
+
+function botResolveCode(code, canDouble, canSplit) {
+  if (code === 'P')  return canSplit  ? 'split'  : 'hit';
+  if (code === 'Rh') return 'hit'; // bots never resign
+  if (code === 'D')  return canDouble ? 'double' : 'hit';
+  if (code === 'DS') return canDouble ? 'double' : 'stand';
+  if (code === 'S')  return 'stand';
+  return 'hit';
+}
+
+const botNormFace = v => ['J','Q','K'].includes(String(v)) ? '10' : String(v);
+
+function getBotStrategyAction(hand, dealerUpcard, canDouble, canSplit) {
+  const col = botDealerCol(dealerUpcard);
+
+  if (hand.length === 2 && canSplit) {
+    const v0 = botNormFace(hand[0].value);
+    const v1 = botNormFace(hand[1].value);
+    if (v0 === v1 && BOT_PAIRS[v0]) {
+      return botResolveCode(BOT_PAIRS[v0][col], canDouble, canSplit);
+    }
+  }
+
+  const hasLiveAce = hand.some(c => c.value === 'A');
+  if (hasLiveAce && hand.length === 2) {
+    const nonAce = hand.find(c => c.value !== 'A');
+    if (nonAce) {
+      const pip = ['J','Q','K'].includes(String(nonAce.value)) ? 10 : Number(nonAce.value);
+      if (pip <= 9 && BOT_SOFT[pip]) {
+        return botResolveCode(BOT_SOFT[pip][col], canDouble, canSplit);
+      }
+    }
+  }
+
+  let total = 0, liveAces = 0;
+  for (const c of hand) {
+    if (c.value === 'A') { total += 11; liveAces++; }
+    else if (['J','Q','K'].includes(String(c.value))) total += 10;
+    else total += Number(c.value);
+  }
+  while (total > 21 && liveAces > 0) { total -= 10; liveAces--; }
+
+  if (total >= 18) return 'stand';
+  const row = BOT_HARD[Math.max(5, Math.min(17, total))];
+  return botResolveCode(row[col], canDouble, canSplit);
+}
+
+// Returns the action a bot should take given its difficulty.
+// expert = perfect strategy, intermediate = 70% optimal, beginner = 30% optimal
+function getBotDecision(difficulty, hand, dealerUpcard, canDouble, canSplit) {
+  const optimal = getBotStrategyAction(hand, dealerUpcard, canDouble, canSplit);
+
+  let useOptimal;
+  const rand = Math.random();
+  if (difficulty === 'expert') useOptimal = true;
+  else if (difficulty === 'intermediate') useOptimal = rand < 0.7;
+  else useOptimal = rand < 0.3; // beginner: 30% correct
+
+  if (useOptimal) return optimal;
+
+  const pool = ['hit', 'stand'];
+  if (canDouble) pool.push('double');
+  if (canSplit) pool.push('split');
+  const wrong = pool.filter(a => a !== optimal);
+  if (wrong.length === 0) return optimal;
+  return wrong[Math.floor(Math.random() * wrong.length)];
+}
+
 // ── Deck helpers ──────────────────────────────────────────────────────────────
 
 const SUITS = ['♠', '♥', '♦', '♣'];
@@ -46,8 +163,8 @@ export default class BlackjackParty {
     this.hostId = null;
     this.status = 'waiting'; // waiting | betting | playing | dealer | round-end
     this.startingBalance = 1000;
-    this.allowMidGameJoin = true;
-    this.allowRejoinAfterBankrupt = true;
+    this.allowMidGameJoin = false;
+    this.allowRejoinAfterBankrupt = false;
     this.deck = createShoe();
     this.dealerHand = [];
     this.dealerHoleHidden = true;
@@ -89,7 +206,17 @@ export default class BlackjackParty {
       splitResult: null,
       resultAmount: 0,
       splitResultAmount: 0,
+      isBot: false,
+      botDifficulty: null,
     };
+  }
+
+  makeBot(name, difficulty) {
+    const id = `bot_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+    const p = this.makePlayer(id, name);
+    p.isBot = true;
+    p.botDifficulty = difficulty;
+    return p;
   }
 
   makeSpectator(connId, name, bankroll = 0, joinType = 'midgame') {
@@ -117,6 +244,8 @@ export default class BlackjackParty {
         splitResult: p.splitResult,
         resultAmount: p.resultAmount,
         splitResultAmount: p.splitResultAmount,
+        isBot: p.isBot || false,
+        botDifficulty: p.botDifficulty || null,
       })),
       spectators: this.spectators.map(s => ({
         id: s.id,
@@ -151,8 +280,9 @@ export default class BlackjackParty {
     this.currentPlayerIndex = -1;
     this.status = 'waiting';
     this.round = 0;
-    if (!this.players.find(p => p.id === this.hostId) && this.players.length > 0) {
-      this.hostId = this.players[0].id;
+    if (!this.players.find(p => p.id === this.hostId && !p.isBot) && this.players.length > 0) {
+      const newHost = this.players.find(p => !p.isBot) || this.players[0];
+      this.hostId = newHost.id;
     }
     this.broadcast({ type: 'lobby:reset', state: this.publicState() });
   }
@@ -240,6 +370,29 @@ export default class BlackjackParty {
       return;
     }
 
+    // ── Add bot (host only) ───────────────────────────────────────────────────
+    if (type === 'lobby:add-bot') {
+      if (this.hostId !== sender.id) return;
+      if (this.status !== 'waiting') return;
+      if (this.players.length >= 5) return;
+      const difficulty = ['beginner', 'intermediate', 'expert'].includes(msg.difficulty)
+        ? msg.difficulty : 'beginner';
+      const label = difficulty === 'expert' ? 'Expert' : difficulty === 'intermediate' ? 'Medium' : 'Easy';
+      const bot = this.makeBot(`Bot [${label}]`, difficulty);
+      this.players.push(bot);
+      this.broadcast({ type: 'lobby:update', state: this.publicState() });
+      return;
+    }
+
+    // ── Remove bot (host only) ────────────────────────────────────────────────
+    if (type === 'lobby:remove-bot') {
+      if (this.hostId !== sender.id) return;
+      if (this.status !== 'waiting') return;
+      this.players = this.players.filter(p => !(p.isBot && p.id === msg.botId));
+      this.broadcast({ type: 'lobby:update', state: this.publicState() });
+      return;
+    }
+
     // ── Lobby start (host only) ───────────────────────────────────────────────
     if (type === 'lobby:start') {
       if (this.hostId !== sender.id) {
@@ -255,6 +408,7 @@ export default class BlackjackParty {
       this.status = 'betting';
       this.round = 1;
       this.broadcast({ type: 'game:started', state: this.publicState() });
+      this.scheduleBotBets();
       return;
     }
 
@@ -445,6 +599,9 @@ export default class BlackjackParty {
       this.currentPlayerIndex = next;
       this.players[next].handStatus = 'acting';
       this.broadcast({ type: 'game:state', state: this.publicState() });
+      if (this.players[next].isBot) {
+        this.scheduleBotAction(this.players[next]);
+      }
     }
   }
 
@@ -515,15 +672,21 @@ export default class BlackjackParty {
     setTimeout(() => {
       if (this.players.length === 0) return;
 
-      // Move players with bankroll < 10 to spectators
-      const toSpectate = this.players.filter(p => p.bankroll < 10);
+      // Bots get a fresh bankroll instead of being spectated
+      for (const p of this.players) {
+        if (p.isBot && p.bankroll < 10) p.bankroll = this.startingBalance;
+      }
+
+      // Move bankrupt humans to spectators
+      const toSpectate = this.players.filter(p => !p.isBot && p.bankroll < 10);
       for (const p of toSpectate) {
         this.spectators.push(this.makeSpectator(p.id, p.name, p.bankroll, 'bankrupt'));
       }
-      this.players = this.players.filter(p => p.bankroll >= 10);
+      this.players = this.players.filter(p => p.isBot || p.bankroll >= 10);
 
-      // All active players bankrupt → reset lobby
-      if (this.players.length === 0) {
+      // No human players left → reset lobby
+      const hasHumans = this.players.some(p => !p.isBot);
+      if (!hasHumans) {
         this.doReset();
         return;
       }
@@ -563,6 +726,7 @@ export default class BlackjackParty {
     this.status = 'betting';
     this.round += 1;
     this.broadcast({ type: 'game:new-round', state: this.publicState() });
+    this.scheduleBotBets();
   }
 
   dealCards() {
@@ -599,6 +763,9 @@ export default class BlackjackParty {
     this.currentPlayerIndex = firstActive;
     this.players[firstActive].handStatus = 'acting';
     this.broadcast({ type: 'game:dealt', state: this.publicState() });
+    if (this.players[firstActive].isBot) {
+      this.scheduleBotAction(this.players[firstActive]);
+    }
   }
 
   // ── Split / bust helpers ───────────────────────────────────────────────────
@@ -610,6 +777,9 @@ export default class BlackjackParty {
     player.hand = [...player.splitHand];
     player.splitHand = null;
     player.handStatus = 'acting';
+    if (player.isBot) {
+      this.scheduleBotAction(player);
+    }
   }
 
   handleBustOrComplete(player, status) {
@@ -624,6 +794,115 @@ export default class BlackjackParty {
         if (this.players.length === 0) return;
         this.advanceToNextPlayer();
       }, status === 'busted' ? 1200 : 300);
+    }
+  }
+
+  // ── Bot automation ─────────────────────────────────────────────────────────
+
+  scheduleBotBets() {
+    const bots = this.players.filter(p => p.isBot);
+    bots.forEach((bot, i) => {
+      setTimeout(() => {
+        if (this.status !== 'betting' || bot.handStatus !== 'betting') return;
+        const chips = [10, 25, 100, 1000].filter(c => c <= bot.bankroll);
+        const amount = chips.length > 0 ? chips[Math.floor(Math.random() * chips.length)] : bot.bankroll;
+        bot.bet = amount;
+        bot.bankroll -= bot.bet;
+        bot.handStatus = 'waiting';
+        this.broadcast({ type: 'game:state', state: this.publicState() });
+        if (this.players.every(p => p.handStatus !== 'betting')) {
+          setTimeout(() => this.dealCards(), 500);
+        }
+      }, (i + 1) * 700);
+    });
+  }
+
+  scheduleBotAction(bot) {
+    const thinkMs = 700 + Math.random() * 700;
+    setTimeout(() => {
+      if (this.status !== 'playing') return;
+      if (bot.handStatus !== 'acting') return;
+      this.executeBotAction(bot);
+    }, thinkMs);
+  }
+
+  executeBotAction(bot) {
+    // dealerHand[0] is face-down hole card, dealerHand[1] is the visible upcard
+    const dealerUpcard = this.dealerHand[1];
+    const alreadySplit = bot.hand1Completed !== null;
+    const canDouble = bot.hand.length === 2 && bot.bankroll >= bot.bet;
+    const canSplit = !alreadySplit && bot.hand.length === 2 &&
+                     bot.hand[0].value === bot.hand[1].value &&
+                     bot.bankroll >= bot.bet;
+
+    const action = getBotDecision(bot.botDifficulty, bot.hand, dealerUpcard, canDouble, canSplit);
+
+    if (action === 'stand') {
+      if (bot.splitHand && bot.splitHand.length > 0) {
+        this.transitionToSplitHand2(bot);
+        this.broadcast({ type: 'game:state', state: this.publicState() });
+      } else {
+        bot.handStatus = 'stood';
+        this.broadcast({ type: 'game:state', state: this.publicState() });
+        setTimeout(() => {
+          if (this.players.length === 0) return;
+          this.advanceToNextPlayer();
+        }, 300);
+      }
+      return;
+    }
+
+    if (action === 'double' && canDouble && this.deck.length > 0) {
+      bot.bankroll -= bot.bet;
+      bot.bet *= 2;
+      bot.hand.push(this.deck.shift());
+      const total = getHandTotal(bot.hand);
+      this.broadcast({ type: 'game:state', state: this.publicState() });
+      setTimeout(() => {
+        if (this.players.length === 0) return;
+        if (bot.splitHand && bot.splitHand.length > 0) {
+          this.transitionToSplitHand2(bot);
+          this.broadcast({ type: 'game:state', state: this.publicState() });
+        } else {
+          bot.handStatus = total > 21 ? 'busted' : 'stood';
+          this.broadcast({ type: 'game:state', state: this.publicState() });
+          setTimeout(() => {
+            if (this.players.length === 0) return;
+            this.advanceToNextPlayer();
+          }, 600);
+        }
+      }, 700);
+      return;
+    }
+
+    if (action === 'split' && canSplit && this.deck.length >= 2) {
+      const [c1, c2] = bot.hand;
+      bot.bankroll -= bot.bet;
+      bot.splitBet = bot.bet;
+      bot.hand = [c1, this.deck.shift()];
+      bot.splitHand = [c2, this.deck.shift()];
+      this.broadcast({ type: 'game:state', state: this.publicState() });
+      this.scheduleBotAction(bot);
+      return;
+    }
+
+    // Hit (default / fallback)
+    if (this.deck.length === 0) return;
+    bot.hand.push(this.deck.shift());
+    const total = getHandTotal(bot.hand);
+    this.broadcast({ type: 'game:state', state: this.publicState() });
+    if (total > 21) {
+      setTimeout(() => {
+        if (this.players.length === 0) return;
+        this.handleBustOrComplete(bot, 'busted');
+      }, 650);
+    } else if (total === 21) {
+      setTimeout(() => {
+        if (this.players.length === 0) return;
+        this.handleBustOrComplete(bot, 'stood');
+      }, 650);
+    } else {
+      this.scheduleBotAction(bot);
     }
   }
 
@@ -646,7 +925,10 @@ export default class BlackjackParty {
     this.players.splice(idx, 1);
     if (this.players.length === 0) return;
 
-    if (this.hostId === connId) this.hostId = this.players[0].id;
+    if (this.hostId === connId) {
+      const newHost = this.players.find(p => !p.isBot) || this.players[0];
+      this.hostId = newHost.id;
+    }
 
     if (this.status === 'playing') {
       if (idx < this.currentPlayerIndex) {
