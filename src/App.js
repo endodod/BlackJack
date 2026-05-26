@@ -33,6 +33,13 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
   const [testDealerHand, setTestDealerHand] = useState(null);
   const earlyResign = true;
   const menuRef = useRef(null);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 930);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 930);
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   // ── Sync volume ──────────────────────────────────────────────────────────────
   useEffect(() => { setVolumeEnabled(volumeOn); }, [volumeOn]);
@@ -97,12 +104,14 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
                 {label}
               </button>
             ))}
-            <button
-              className="nav-btn"
-              onClick={() => { if (gamePhase !== 'betting') cancelHand(); onSwitchToMultiplayer?.(); }}
-            >
-              Multiplayer
-            </button>
+            {!isMobile && (
+              <button
+                className="nav-btn"
+                onClick={() => { if (gamePhase !== 'betting') cancelHand(); onSwitchToMultiplayer?.(); }}
+              >
+                Multiplayer
+              </button>
+            )}
           </nav>
           <button className="nav-btn nav-btn-highlight" onClick={() => setShowLeaderboard(true)}>
             Leaderboard
@@ -176,10 +185,12 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
                       }}
                     >{label}</button>
                   ))}
-                  <button
-                    className="menu-mode-btn"
-                    onClick={() => { setMenuOpen(false); if (gamePhase !== 'betting') cancelHand(); onSwitchToMultiplayer?.(); }}
-                  >Multiplayer</button>
+                  {!isMobile && (
+                    <button
+                      className="menu-mode-btn"
+                      onClick={() => { setMenuOpen(false); if (gamePhase !== 'betting') cancelHand(); onSwitchToMultiplayer?.(); }}
+                    >Multiplayer</button>
+                  )}
                 </div>
                 {/* Mobile-only: account section */}
                 {session?.user?.username && (
