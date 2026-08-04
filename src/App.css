@@ -1002,11 +1002,13 @@ kbd.key-hint {
   /* ── Header: single row, 3-column grid ── */
   .game-header {
     display: grid;
-    grid-template-columns: 1fr auto 1fr;
+    /* Title sizes to its own content instead of sharing a track with the
+       bankroll column — prevents the (now larger) title from overlapping it. */
+    grid-template-columns: auto 1fr auto;
     align-items: center;
-    padding: 0 0.75em;
+    padding: 0 1em;
     gap: 0;
-    min-height: 52px;
+    min-height: 68px;
   }
 
   /* Column 1: title only — hide desktop nav */
@@ -1022,21 +1024,22 @@ kbd.key-hint {
   }
 
   .game-title {
-    font-size: 1.3em;
+    font-size: 1.6em;
     letter-spacing: 0.08em;
   }
 
   .game-title-btn {
-    font-size: 1.3em;
+    font-size: 1.6em;
     letter-spacing: 0.08em;
   }
 
-  /* Column 2: bankroll centered */
+  /* Column 2: bankroll, nudged right of the title */
   .mobile-bankroll {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.05em;
+    padding-left: 0.75em;
+    font-size: 1.3em;
     font-weight: 800;
     color: #f59e0b;
     letter-spacing: 0.02em;
@@ -1044,7 +1047,7 @@ kbd.key-hint {
   }
 
   .mobile-bet {
-    font-size: 0.9em;
+    font-size: 0.95em;
     font-weight: 700;
     color: rgba(255, 255, 255, 0.65);
     border-left: 1px solid rgba(255, 255, 255, 0.2);
@@ -1068,12 +1071,95 @@ kbd.key-hint {
   .icon-gear   { display: none; }
   .icon-burger { display: block; }
 
+  .settings-btn {
+    padding: 0.6em;
+  }
+
+  .settings-btn svg.icon-burger {
+    width: 30px;
+    height: 30px;
+  }
+
   /* No rotation animation for burger icon */
   .settings-btn-open { transform: none; }
 
-  /* Burger menu: show mobile-only sections */
+  /* Burger menu: show mobile-only sections, sized up for touch */
   .menu-panel {
-    min-width: 240px;
+    min-width: 280px;
+    padding: 1.3em;
+    gap: 0.9em;
+  }
+
+  .menu-section-label {
+    font-size: 0.95em;
+  }
+
+  .menu-row {
+    padding: 0.15em 0;
+  }
+
+  .menu-label {
+    font-size: 1.05em;
+  }
+
+  .menu-toggle {
+    font-size: 0.95em;
+    padding: 0.4em 1.1em;
+    min-width: 60px;
+  }
+
+  .menu-volume-slider {
+    width: 130px;
+  }
+
+  .menu-volume-slider::-webkit-slider-thumb {
+    width: 18px;
+    height: 18px;
+  }
+
+  .menu-volume-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+  }
+
+  .menu-mode-btn,
+  .menu-leaderboard-btn,
+  .menu-profile-link,
+  .menu-auth-btn,
+  .menu-logout-btn {
+    font-size: 1.05em;
+    padding: 0.75em 0.9em;
+  }
+
+  .menu-mode-btn-locked {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25em;
+    opacity: 0.6;
+    cursor: default;
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  .menu-mode-locked-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+  }
+
+  .menu-lock-icon {
+    width: 0.85em;
+    height: 0.85em;
+    flex-shrink: 0;
+    opacity: 0.75;
+  }
+
+  .menu-mode-locked-hint {
+    font-size: 0.75em;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.4);
+    letter-spacing: 0.02em;
   }
 
   .menu-mobile-section {
@@ -1160,22 +1246,56 @@ kbd.key-hint {
   /* Table area: tighter padding */
   .table-area {
     padding: 1.5em 0.75em;
+    /* Dealer → rules line → player cards form one fixed-rhythm group anchored
+       to the top, so none of them shift when the controls bar below changes
+       height (e.g. player action buttons appearing/disappearing). */
+    justify-content: flex-start;
+    gap: 0.6em;
+  }
+
+  /* Rules line becomes a normal (non-decorative) flow item, slotted between
+     the dealer hand and the player hand via order, instead of being
+     absolutely centered over the whole (variable-height) table area.
+     margin-top: auto pushes it (and the player zone after it) down as far
+     as possible — since the controls bar below now has a constant height
+     (see .controls-bar), this reliably lands the line exactly far enough
+     up that the reserved 2-row player zone fits between it and the
+     controls without the line itself ever moving. */
+  .table-rules {
+    position: static;
+    left: auto;
+    top: auto;
+    transform: none;
+    order: 2;
+    margin-top: auto;
+  }
+
+  /* Player hand (single or split) always renders right after the rules line.
+     min-height reserves room for exactly 2 wrapped rows of (mobile-sized)
+     cards + the hand label, so hitting into a 2nd row never needs new
+     space — it grows into space that was already reserved. */
+  .player-section {
+    order: 3;
+    min-height: 20em;
+    margin-bottom: 0.8em;
   }
 
   /* Hide absolute training panel — replaced by inline mobile bar */
   .training-controls-left { display: none; }
 
-  /* Training strip between table and controls */
+  /* Training strip: top of the table, right below the navbar */
   .training-mobile-bar {
     display: flex;
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
+    width: 100%;
     padding: 0.4em 0.75em;
     gap: 0.75em;
     background: rgba(0, 0, 0, 0.25);
-    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     flex-shrink: 0;
+    order: -1;
   }
 
   .training-mobile-bar-actions {
@@ -1184,10 +1304,15 @@ kbd.key-hint {
     flex-shrink: 0;
   }
 
+  .training-mobile-bar .training-hand-btn {
+    font-size: 1em;
+    padding: 0.6em 1.2em;
+  }
+
   .training-mobile-bar-stats {
     display: flex;
     gap: 0.75em;
-    font-size: 0.85em;
+    font-size: 1em;
     color: rgba(255, 255, 255, 0.6);
   }
 
@@ -1202,9 +1327,19 @@ kbd.key-hint {
     gap: 0.5em;
   }
 
-  /* Controls bar: natural height, no 200px floor */
+  /* Bigger dealt cards (width/height are em-based, so bumping the card's own
+     font-size scales the box and its corner/suit text together) */
+  .card {
+    font-size: 1.25em;
+  }
+
+  /* Controls bar: constant height across betting / actions / result / etc.
+     so the table above it (and the reserved player-card zone) never
+     resizes when its content changes — e.g. action buttons appearing.
+     17.5em comfortably covers the betting panel (chips + bet row + deal
+     button stacked), the tallest of the states this bar cycles through. */
   .controls-bar {
-    min-height: 0;
+    min-height: 17.5em;
     padding: 0.75em 1em;
   }
 
@@ -1220,14 +1355,14 @@ kbd.key-hint {
   .action-buttons-wrapper {
     flex-wrap: wrap;
     justify-content: center;
-    max-width: 320px;
+    max-width: 380px;
   }
 
   .action-btn {
     flex: 1 1 calc(50% - 0.8em);
     min-width: 0;
-    padding: 0.75em 1em;
-    font-size: 1.1em;
+    padding: 0.95em 1.2em;
+    font-size: 1.3em;
   }
 }
 

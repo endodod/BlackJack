@@ -74,6 +74,12 @@
   padding: 0.2em 0.6em;
 }
 
+/* ── Tabs (mobile-only toggle, hidden on desktop) ─────── */
+
+.st-tabs {
+  display: none;
+}
+
 /* ── Tables layout ───────────────────────────────────── */
 
 .st-tables {
@@ -139,3 +145,50 @@
 .sc-ds { background: rgba(6,   182, 212, 0.22); color: #22d3ee; }
 .sc-p  { background: rgba(124, 58,  237, 0.25); color: #a78bfa; }
 .sc-rh { background: rgba(217, 119, 6,   0.25); color: #d97706; }
+
+/* ── Mobile: one table at a time, switched via tabs ───── */
+
+@media (max-width: 929px) {
+  .st-tabs {
+    display: flex;
+    gap: 0.5em;
+  }
+
+  .st-tab-btn {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1.5px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.85em;
+    font-weight: 700;
+    padding: 0.6em 0.4em;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s;
+  }
+
+  .st-tab-btn-active {
+    background: rgba(245, 158, 11, 0.14);
+    border-color: rgba(245, 158, 11, 0.5);
+    color: #f59e0b;
+  }
+
+  .st-tables {
+    gap: 0;
+  }
+
+  .st-block {
+    display: none;
+    width: 100%;
+  }
+
+  .st-block-active {
+    display: flex;
+  }
+
+  .st-table {
+    width: 100%;
+    font-size: 0.85em;
+  }
+}

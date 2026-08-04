@@ -185,7 +185,18 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
                       }}
                     >{label}</button>
                   ))}
-                  {!isMobile && (
+                  {isMobile ? (
+                    <div className="menu-mode-btn menu-mode-btn-locked" aria-disabled="true">
+                      <span className="menu-mode-locked-row">
+                        <svg className="menu-lock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="5" y="11" width="14" height="10" rx="2"/>
+                          <path d="M8 11V7a4 4 0 0 1 8 0v4"/>
+                        </svg>
+                        <span>Multiplayer</span>
+                      </span>
+                      <span className="menu-mode-locked-hint">Desktop only</span>
+                    </div>
+                  ) : (
                     <button
                       className="menu-mode-btn"
                       onClick={() => { setMenuOpen(false); if (gamePhase !== 'betting') cancelHand(); onSwitchToMultiplayer?.(); }}
@@ -265,6 +276,30 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
       {/* ── Board ── */}
       <div className="green-board">
         <div className="table-area">
+          {/* Training strip (mobile only): sits right below the navbar, above the dealer's cards */}
+          {trainingMode === 'basic' && !trainingSetup && (
+            <div className="training-mobile-bar">
+              <div className="training-mobile-bar-actions">
+                <button
+                  className="training-hand-btn"
+                  onClick={() => { if (gamePhase !== 'betting') cancelHand(); setTrainingSetup(true); }}
+                >
+                  Reconfigure
+                </button>
+                <button
+                  className="training-hand-btn strategy-table-btn"
+                  onClick={() => setShowStrategyTable(true)}
+                >
+                  Strategy Table
+                </button>
+              </div>
+              <div className="training-mobile-bar-stats">
+                <span>Hands <strong>{strategyStats.total}</strong></span>
+                <span>Accuracy <strong>{strategyStats.total > 0 ? `${Math.round(strategyStats.correct / strategyStats.total * 100)}%` : '—'}</strong></span>
+              </div>
+            </div>
+          )}
+
           <div className="table-rules">
             <span>Blackjack Pays 3 to 2</span>
             <span className="table-rules-divider">·</span>
@@ -340,7 +375,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
           {statusMessage && <StatusBanner message={statusMessage} />}
 
           {isSplitActive ? (
-            <div className="split-hands-row">
+            <div className="split-hands-row player-section">
               <PlayerHand
                 hand={splitHand1Completed.length > 0 ? splitHand1Completed : playerHand}
                 label="Hand 1"
@@ -356,30 +391,6 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
             <PlayerHand hand={playerHand} />
           )}
         </div>
-
-        {/* ── Training strip (mobile only) ── */}
-        {trainingMode === 'basic' && !trainingSetup && (
-          <div className="training-mobile-bar">
-            <div className="training-mobile-bar-actions">
-              <button
-                className="training-hand-btn"
-                onClick={() => { if (gamePhase !== 'betting') cancelHand(); setTrainingSetup(true); }}
-              >
-                Reconfigure
-              </button>
-              <button
-                className="training-hand-btn strategy-table-btn"
-                onClick={() => setShowStrategyTable(true)}
-              >
-                Strategy Table
-              </button>
-            </div>
-            <div className="training-mobile-bar-stats">
-              <span>Hands <strong>{strategyStats.total}</strong></span>
-              <span>Accuracy <strong>{strategyStats.total > 0 ? `${Math.round(strategyStats.correct / strategyStats.total * 100)}%` : '—'}</strong></span>
-            </div>
-          </div>
-        )}
 
         {/* ── Controls bar ── */}
         <div className="controls-bar">

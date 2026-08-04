@@ -216,3 +216,28 @@
   filter: none;
   box-shadow: none;
 }
+
+/* ── Mobile: bigger chips, buttons ─────────────────────── */
+
+@media (max-width: 929px) {
+  .chip-button {
+    width: 5.1em;
+    height: 5.1em;
+    font-size: 1.05em;
+  }
+
+  .bet-display {
+    font-size: 1.2em;
+    padding: 0.6em 1.6em;
+  }
+
+  .clear-btn {
+    font-size: 1.1em;
+    padding: 0.6em 1.5em;
+  }
+
+  .deal-btn {
+    font-size: 1.45em;
+    padding: 1em 2.8em;
+  }
+}

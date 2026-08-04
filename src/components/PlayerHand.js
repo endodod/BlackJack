@@ -11,7 +11,7 @@ export default function PlayerHand({ hand, label, isActive }) {
   const isLabelled = label != null;
 
   return (
-    <div className={`hand-section${isLabelled && !isActive ? ' hand-section-inactive' : ''}`}>
+    <div className={`hand-section player-section${isLabelled && !isActive ? ' hand-section-inactive' : ''}`}>
       <div className="cards-row">
         {displayHand.map((c, index) => (
           <div

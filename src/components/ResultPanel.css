@@ -112,3 +112,10 @@
   height: 4.5em;
   background-color: rgba(255, 255, 255, 0.15);
 }
+
+@media (max-width: 929px) {
+  .next-hand-btn {
+    font-size: 1.45em;
+    padding: 1em 2.8em;
+  }
+}

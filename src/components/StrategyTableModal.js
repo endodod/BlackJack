@@ -1,9 +1,15 @@
 'use client'
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { HARD, SOFT, PAIRS } from '../theory/basicStrategy';
 import './StrategyTableModal.css';
 
 const DEALER_COLS = ['2','3','4','5','6','7','8','9','10','A'];
+
+const TABS = [
+  ['hard', 'Hard Totals'],
+  ['soft', 'Soft Hands'],
+  ['pairs', 'Pairs'],
+];
 
 function cellClass(code) {
   if (code === 'H')  return 'sc-h';
@@ -15,9 +21,9 @@ function cellClass(code) {
   return '';
 }
 
-function StrategyTable({ title, rows, rowLabel }) {
+function StrategyTable({ id, activeTable, title, rows, rowLabel }) {
   return (
-    <div className="st-block">
+    <div className={`st-block${id === activeTable ? ' st-block-active' : ''}`}>
       <div className="st-title">{title}</div>
       <table className="st-table">
         <thead>
@@ -42,6 +48,8 @@ function StrategyTable({ title, rows, rowLabel }) {
 }
 
 export default function StrategyTableModal({ onClose }) {
+  const [activeTable, setActiveTable] = useState('hard');
+
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', handler);
@@ -63,18 +71,37 @@ export default function StrategyTableModal({ onClose }) {
           <span className="st-leg sc-p">P Split</span>
           <span className="st-leg sc-rh">Rh Resign/Hit</span>
         </div>
+        {/* Mobile-only: toggle between the 3 tables instead of stacking them */}
+        <div className="st-tabs">
+          {TABS.map(([id, label]) => (
+            <button
+              key={id}
+              className={`st-tab-btn${activeTable === id ? ' st-tab-btn-active' : ''}`}
+              onClick={() => setActiveTable(id)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
         <div className="st-tables">
           <StrategyTable
+            id="hard"
+            activeTable={activeTable}
             title="Hard Totals"
             rows={HARD}
             rowLabel={k => k}
           />
           <StrategyTable
+            id="soft"
+            activeTable={activeTable}
             title="Soft Hands"
             rows={SOFT}
             rowLabel={k => `A+${k}`}
           />
           <StrategyTable
+            id="pairs"
+            activeTable={activeTable}
             title="Pairs"
             rows={PAIRS}
             rowLabel={k => `${k}+${k}`}

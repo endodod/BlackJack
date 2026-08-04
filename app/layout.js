@@ -15,7 +15,7 @@ export const metadata = {
 export default async function RootLayout({ children }) {
   const session = await getServerSession(authOptions)
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <script dangerouslySetInnerHTML={{ __html: `
