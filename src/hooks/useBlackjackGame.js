@@ -1,7 +1,7 @@
 'use client'
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { DeckContext } from '../context/DeckContext';
-import { playSound, resumeAudio } from '../lib/sound';
+import { playSound, resumeAudio, setSoundsSuspended } from '../lib/sound';
 import checkWinner from '../logic/checkWinner';
 import getHandTotal from '../logic/getHandTotal';
 import drawCard from '../logic/drawCard';
@@ -324,14 +324,24 @@ export function useBlackjackGame({
     if (playerHand.length !== 2 || (trainingModeRef.current !== 'basic' && currentBet > bankroll) || deck.length === 0) return;
     handleActionValidation('double');
     if (trainingModeRef.current === 'basic') return;
+    playSound('chip');
     setBankroll(prev => prev - currentBet);
     setCurrentBet(prev => prev * 2);
     const { updatedHand, updatedDeck } = drawCard({ hand: playerHand, deck });
-    playSound('draw');
-    setTimeout(() => { setPlayerHand(updatedHand); setDeck(updatedDeck); }, 500);
-    setTimeout(() => setPlayerTurn(false), 1150);
+    setTimeout(() => {
+      playSound('draw');
+      setTimeout(() => { setPlayerHand(updatedHand); setDeck(updatedDeck); }, 500);
+      setTimeout(() => setPlayerTurn(false), 1150);
+    }, 200);
   }, [playerHand, currentBet, bankroll, deck, setBankroll, setCurrentBet, setPlayerHand, setDeck, setPlayerTurn,
       handleActionValidation]);
+
+  const handleStand = useCallback(() => {
+    handleActionValidation('stand');
+    if (trainingModeRef.current === 'basic') return;
+    playSound('stand');
+    setTimeout(() => setPlayerTurn(false), 500);
+  }, [setPlayerTurn, handleActionValidation]);
 
   const handleSplit = useCallback(() => {
     const isAlreadySplit = splitHand2.length > 0 || splitHand1Completed.length > 0;
@@ -667,7 +677,10 @@ export function useBlackjackGame({
           break;
         case 's':
           handleActionValidation('stand');
-          if (trainingModeRef.current !== 'basic') setPlayerTurn(false);
+          if (trainingModeRef.current !== 'basic') {
+            playSound('stand');
+            setTimeout(() => setPlayerTurn(false), 500);
+          }
           break;
         case 'd': handleDouble(); break;
         case 'a': handleSplit(); break;
@@ -678,6 +691,12 @@ export function useBlackjackGame({
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [gamePhase, playerHand, deck, handleDouble, handleSplit, handleResign, setPlayerHand, setDeck, setPlayerTurn, handleActionValidation]);
+
+  // ── Suspend sounds while the round result is on screen ───────────────────────
+
+  useEffect(() => {
+    setSoundsSuspended(gamePhase === 'result' || gamePhase === 'training-result');
+  }, [gamePhase]);
 
   // ── Auto-advance training-result after 1.8s ──────────────────────────────────
 
@@ -721,7 +740,7 @@ export function useBlackjackGame({
     // Derived
     isSplitActive, isOutOfMoney, hasSplitPair, canSplit, canDouble, canResign,
     // Handlers
-    dealCards, cancelHand, handleDouble, handleSplit, handleResign,
+    dealCards, cancelHand, handleDouble, handleStand, handleSplit, handleResign,
     handleReset, handleResultsClose, handleActionValidation,
   };
 }

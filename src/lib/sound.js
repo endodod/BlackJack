@@ -3,6 +3,7 @@
 const BASE_VOLUME = 0.5;
 let volumeOn = true;
 let volumeLevel = 1.0;
+let soundsSuspended = false;
 let audioCtx = null;
 // Tracks per-event: true = loaded OK, false = failed to load, undefined = loading
 const audioReady = {};
@@ -161,8 +162,13 @@ function playCardDraw({ duration = 0.16, volume = 0.16, when = 0 }) {
   source.stop(ctx.currentTime + when + duration);
 }
 
+export function setSoundsSuspended(suspended) {
+  soundsSuspended = !!suspended;
+}
+
 export function playSound(event) {
   if (!volumeOn) return;
+  if (soundsSuspended) return;
   // Ensure the AudioContext is running — harmless if already running.
   resumeAudio();
 

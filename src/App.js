@@ -63,7 +63,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
     isSplitActive, isOutOfMoney, hasSplitPair, canSplit, canDouble, canResign,
     splitHand2, splitHand1Completed, splitBet, splitHand1Bet,
     playerHand, dealerHand, bankroll, currentBet,
-    dealCards, cancelHand, handleDouble, handleSplit, handleResign,
+    dealCards, cancelHand, handleDouble, handleStand, handleSplit, handleResign,
     handleReset, handleResultsClose, handleActionValidation,
   } = useBlackjackGame({
     initialStats,
@@ -414,6 +414,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
               canDouble={canDouble}
               canResign={canResign}
               onDouble={handleDouble}
+              onStand={trainingMode !== 'basic' ? handleStand : undefined}
               onSplit={handleSplit}
               onResign={handleResign}
               onValidate={trainingMode === 'basic' ? handleActionValidation : undefined}
