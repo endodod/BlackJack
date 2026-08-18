@@ -105,13 +105,14 @@ export default function ProfilePage() {
       <div className="profile-container">
 
         <div className="profile-header">
-          <Link href="/" className="profile-back-btn">← Back to Game</Link>
           <h1 className="profile-username">{username}</h1>
+          <Link href="/" className="profile-back-btn">← Back to Game</Link>
         </div>
 
         {/* Stats */}
         <section className="profile-section">
           <h2 className="profile-section-title">Singleplayer Statistics</h2>
+          <p className="profile-section-note">Hands, win rate, total income, blackjacks and pushes are for your current bankroll since the last reset.</p>
           <div className="profile-stats-grid">
             <div className="profile-stat">
               <span className="profile-stat-label">Bankroll</span>

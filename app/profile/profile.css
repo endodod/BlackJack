@@ -18,7 +18,9 @@
 
 .profile-header {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
   gap: 0.4em;
 }
 
@@ -29,6 +31,7 @@
   font-weight: 600;
   transition: color 0.15s;
   width: fit-content;
+  flex-shrink: 0;
 }
 
 .profile-back-btn:hover {
@@ -64,6 +67,12 @@
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.4);
   margin: 0;
+}
+
+.profile-section-note {
+  font-size: 0.8em;
+  color: rgba(255, 255, 255, 0.35);
+  margin: -0.5em 0 0;
 }
 
 .profile-stats-grid {

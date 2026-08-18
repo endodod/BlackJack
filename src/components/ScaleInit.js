@@ -16,6 +16,9 @@ export default function ScaleInit() {
       document.documentElement.style.zoom = scale;
       var realVh = (h / scale) * 0.01;
       document.documentElement.style.setProperty('--real-vh', realVh + 'px');
+
+      var isTargetWindow = w === 1536 && h === 703;
+      document.documentElement.classList.toggle('window-1536x703', isTargetWindow);
     }
     applyScale();
     window.addEventListener('resize', applyScale);

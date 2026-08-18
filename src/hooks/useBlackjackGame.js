@@ -657,10 +657,11 @@ export function useBlackjackGame({
         case 'w':
           if (deck.length > 0) {
             handleActionValidation('hit');
-            playSound('draw');
             if (trainingModeRef.current !== 'basic') {
               const { updatedHand, updatedDeck } = drawCard({ hand: playerHand, deck });
-              setTimeout(() => { setPlayerHand(updatedHand); setDeck(updatedDeck); }, 500);
+              setTimeout(() => { playSound('draw'); setPlayerHand(updatedHand); setDeck(updatedDeck); }, 500);
+            } else {
+              playSound('draw');
             }
           }
           break;

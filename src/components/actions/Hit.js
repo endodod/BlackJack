@@ -10,9 +10,9 @@ export default function Hit({ onValidate }) {
         // Only allow hit if it's player's turn and deck has cards
         if (playerTurn && deck.length > 0) {
             if (onValidate) onValidate('hit');
-            playSound('draw');
             const {updatedHand, updatedDeck} = drawCard({hand: playerHand, deck: deck});
             setTimeout(() => {
+                playSound('draw');
                 setPlayerHand(updatedHand);
                 setDeck(updatedDeck);
             }, 500);

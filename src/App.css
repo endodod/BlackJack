@@ -674,6 +674,13 @@
   min-height: 0;
 }
 
+/* Exact viewport 1536x703 only: dealer/player hands sit too close together
+   at this size, so trim the bottom padding to open a gap and push the
+   player hand further toward the bottom of the page. */
+html.window-1536x703 .table-area {
+  padding-bottom: 0.5em;
+}
+
 /* ── Table Rules ─────────────────────────────────────── */
 
 .table-rules {
