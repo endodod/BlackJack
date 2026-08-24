@@ -1396,66 +1396,60 @@ kbd.key-hint {
 .broke-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(0, 0, 0, 0.35);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
-  backdrop-filter: blur(4px);
+  z-index: 200;
+  backdrop-filter: blur(1px);
+  padding: 1em;
 }
 
 .broke-modal {
   background: #0f0f1a;
   border: 1px solid #2a2a40;
-  border-radius: 18px;
-  padding: 2.5em 3em;
+  border-radius: 16px;
+  padding: 1.4em 1.6em;
+  max-width: 300px;
   text-align: center;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.8);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.6em;
+  gap: 0.7em;
 }
 
 .broke-title {
   margin: 0;
-  font-size: 2.4em;
+  font-size: 1.15em;
   font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: #f87171;
-  text-shadow: 0 0 30px rgba(248, 113, 113, 0.4);
 }
 
 .broke-subtitle {
   margin: 0;
-  font-size: 1.1em;
-  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.85em;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.5);
 }
 
 .broke-reset-btn {
-  margin-top: 0.8em;
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-  color: #fff;
-  border: none;
-  border-radius: 12px;
-  padding: 0.9em 2.6em;
-  font-size: 1.3em;
-  font-weight: 800;
+  margin-top: 0.3em;
+  background: rgba(245, 158, 11, 0.2);
+  border: 1.5px solid rgba(245, 158, 11, 0.5);
+  border-radius: 8px;
+  color: #f59e0b;
+  font-size: 0.95em;
+  font-weight: 700;
+  padding: 0.6em 1.6em;
   cursor: pointer;
-  letter-spacing: 0.05em;
-  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
-  box-shadow: 0 4px 18px rgba(37, 99, 235, 0.4);
+  transition: background 0.15s;
 }
 
 .broke-reset-btn:hover {
-  filter: brightness(1.1);
-  transform: translateY(-3px);
-  box-shadow: 0 8px 26px rgba(37, 99, 235, 0.55);
-}
-
-.broke-reset-btn:active {
-  transform: translateY(0);
-  filter: brightness(0.95);
-  box-shadow: none;
+  background: rgba(245, 158, 11, 0.3);
 }
 
 .hud-user {

@@ -448,9 +448,9 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
       {isOutOfMoney && trainingMode !== 'basic' && (
         <div className="broke-overlay">
           <div className="broke-modal">
-            <h2 className="broke-title">You&apos;re broke!</h2>
-            <p className="broke-subtitle">Not enough to place a bet.</p>
-            <button className="broke-reset-btn" onClick={handleReset}>Reset</button>
+            <h2 className="broke-title">Bankrupt</h2>
+            <p className="broke-subtitle">Your bankroll is too low to place the minimum bet. It will be reset to $1000.</p>
+            <button className="broke-reset-btn" onClick={handleReset}>Continue</button>
           </div>
         </div>
       )}

@@ -440,13 +440,8 @@ export function useBlackjackGame({
     setSplitBet(0);
     setSplitHand1Bet(0);
     setSplitResults(null);
-    if (bankroll < 10) {
-      setBankroll(1000);
-      setLastBetAmount(0);
-      onReset?.();
-    }
     setGamePhase('betting');
-  }, [setPlayerHand, setDealerHand, setPlayerTurn, setCurrentBet, bankroll, onReset]);
+  }, [setPlayerHand, setDealerHand, setPlayerTurn, setCurrentBet]);
 
   const handleReset = useCallback(() => {
     gameTransitionRef.current = false;
