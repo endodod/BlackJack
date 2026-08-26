@@ -8,6 +8,22 @@ import { playSound } from '../lib/sound';
 
 const QUICK_BETS = [10, 25, 100, 500];
 
+// The center-stage view always shows the current actor's hand immediately — no
+// artificial delay holding back the swap. The only pause is this cooldown: once it
+// becomes YOUR turn, your hand is already visible, but your action buttons (and
+// keyboard shortcuts) stay disabled for this long before you can actually act.
+const LOCAL_ACT_COOLDOWN_MS = 1100;
+
+// The instant the last player finishes, the round moves into the dealer phase and
+// the dealer's hole card is already revealed in server state. Hold here on your own
+// hand for this long first — dealer's card stays face-down client-side — before the
+// dealer's turn actually starts showing. The dealer's own first extra draw (if it
+// needs one) fires 1000ms after entering this phase (party/index.js dealerDraw), so
+// this must stay under that or the dealer secretly draws a card while we're still
+// holding on your hand — then everything jumps at once (hole flips + extra card
+// appear together) the moment this pause ends. Bug found: this used to be 1200ms.
+const DEALER_START_PAUSE_MS = 800;
+
 function HandTotal({ hand }) {
   const total = hand.length > 0 ? getHandTotal(hand) : null;
   if (total === null) return null;
@@ -134,9 +150,9 @@ function PlayerWindow({ player, isActive, isLocal, isPlayerHost }) {
   );
 }
 
-// ── Local player's full-size hand (mirrors singleplayer) ──────────────────────
+// ── Featured hand — the current actor's hand (or your own) ────────────────────
 
-function LocalPlayerHand({ player, status }) {
+function FeaturedPlayerHand({ player, status, isOther }) {
   if (!player) return null;
 
   const isSplit = player.hand1Completed && player.hand1Completed.length > 0;
@@ -147,22 +163,24 @@ function LocalPlayerHand({ player, status }) {
     : player.result === 'Push' ? 'mp-local-result-push'
     : player.result ? 'mp-local-result-lose' : '';
 
+  const handLabelClass = `hand-label${isOther ? ' hand-label-spotlight' : ''}`;
+
+  let content;
+
   if (player.hand.length === 0) {
-    return (
+    content = (
       <div className="hand-section mp-local-hand">
-        <div className="hand-label"><span>{player.name}</span></div>
+        <div className={handLabelClass}><span>{player.name}</span></div>
         <div className="cards-row">
           {[0, 1].map(i => <div key={i} className="card" style={{ visibility: 'hidden' }} />)}
         </div>
       </div>
     );
-  }
-
-  if (isSplit) {
-    return (
+  } else if (isSplit) {
+    content = (
       <div className="mp-local-split-row">
         <div className="hand-section">
-          <div className="hand-label">
+          <div className={handLabelClass}>
             <span>Hand 1</span>
             <HandTotal hand={player.hand1Completed} />
           </div>
@@ -171,7 +189,7 @@ function LocalPlayerHand({ player, status }) {
           </div>
         </div>
         <div className="hand-section">
-          <div className="hand-label">
+          <div className={handLabelClass}>
             <span>Hand 2</span>
             <HandTotal hand={player.hand} />
           </div>
@@ -181,52 +199,122 @@ function LocalPlayerHand({ player, status }) {
         </div>
       </div>
     );
+  } else {
+    content = (
+      <div className="hand-section mp-local-hand">
+        <div className={handLabelClass}>
+          <span>{player.name}</span>
+          <HandTotal hand={player.hand} />
+          {hasSplitWaiting && <span style={{ fontSize: '0.75em', color: 'rgba(255,255,255,0.35)', fontStyle: 'italic' }}>+ split</span>}
+          {player.result && <span className={`mp-local-result ${resultClass}`}>{player.result}</span>}
+        </div>
+        <div className="cards-row">
+          {player.hand.map((c, i) => <Card key={`${i}-${c.value}${c.suit}`} card={c} />)}
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="hand-section mp-local-hand">
-      <div className="hand-label">
-        <span>{player.name}</span>
-        <HandTotal hand={player.hand} />
-        {hasSplitWaiting && <span style={{ fontSize: '0.75em', color: 'rgba(255,255,255,0.35)', fontStyle: 'italic' }}>+ split</span>}
-        {player.result && <span className={`mp-local-result ${resultClass}`}>{player.result}</span>}
-      </div>
-      <div className="cards-row">
-        {player.hand.map((c, i) => <Card key={`${i}-${c.value}${c.suit}`} card={c} />)}
-      </div>
+    <div className="mp-featured-hand">
+      {content}
     </div>
   );
 }
 
 // ── Betting panel ─────────────────────────────────────────────────────────────
 
-function BettingPanel({ bankroll, onBet, defaultBet = 0 }) {
+const BETTING_PRESS_ANIMATION_MS = 180;
+
+function BettingPanel({ bankroll, onBet, defaultBet = 0, showHotkeys = true }) {
   const [betAmount, setBetAmount] = useState(() => defaultBet <= bankroll ? defaultBet : 0);
+  const [isDesktop, setIsDesktop] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 930);
+  const [pressedBtn, setPressedBtn] = useState(null);
+  const pressTimeoutRef = useRef(null);
+  const showHints = isDesktop && showHotkeys;
+
+  useEffect(() => {
+    const check = () => setIsDesktop(window.innerWidth >= 930);
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
+  useEffect(() => () => clearTimeout(pressTimeoutRef.current), []);
+
+  const flashPress = (id) => {
+    clearTimeout(pressTimeoutRef.current);
+    setPressedBtn(id);
+    pressTimeoutRef.current = setTimeout(() => setPressedBtn(null), BETTING_PRESS_ANIMATION_MS);
+  };
 
   const handleQuickBet = (amount) => {
-    if (betAmount + amount <= bankroll) { setBetAmount(prev => prev + amount); playSound('chip'); }
+    if (betAmount + amount > bankroll) return false;
+    setBetAmount(prev => prev + amount);
+    playSound('chip');
+    return true;
+  };
+
+  const handleClear = () => {
+    if (betAmount === 0) return false;
+    setBetAmount(0);
+    playSound('clearbet');
+    return true;
   };
 
   const handleDeal = () => {
-    if (betAmount > 0 && betAmount <= bankroll) { onBet(betAmount); setBetAmount(0); }
+    if (!(betAmount > 0 && betAmount <= bankroll)) return false;
+    onBet(betAmount);
+    setBetAmount(0);
+    return true;
   };
+
+  useEffect(() => {
+    const handleKey = (e) => {
+      if (e.target.tagName === 'INPUT') return;
+      if (e.code === 'Space') { e.preventDefault(); if (handleDeal()) flashPress('deal'); }
+      if (!isDesktop || e.ctrlKey || e.altKey || e.metaKey) return;
+      const chipIndex = ['1', '2', '3', '4'].indexOf(e.key);
+      if (chipIndex !== -1) { if (handleQuickBet(QUICK_BETS[chipIndex])) flashPress(`chip-${chipIndex}`); return; }
+      if (e.key === 'c' || e.key === 'C') { if (handleClear()) flashPress('clear'); }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [betAmount, bankroll, isDesktop]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="betting-panel">
       <div className="betting-row">
         <div className="chip-row">
-          {QUICK_BETS.map(amount => (
-            <button key={amount} className="chip-button" onClick={() => handleQuickBet(amount)} disabled={betAmount + amount > bankroll}>
-              ${amount}
+          {QUICK_BETS.map((amount, i) => (
+            <button
+              key={amount}
+              className={`chip-button${pressedBtn === `chip-${i}` ? ' key-pressed' : ''}`}
+              onClick={() => handleQuickBet(amount)}
+              disabled={betAmount + amount > bankroll}
+            >
+              <span className="chip-amount">${amount}</span>
+              {showHints && <span className="hotkey-hint">{i + 1}</span>}
             </button>
           ))}
         </div>
         <div className="bet-display">Bet: <span className="bet-amount">${betAmount}</span></div>
-        <button className="clear-btn" onClick={() => { setBetAmount(0); playSound('clearbet'); }} disabled={betAmount === 0}>Clear</button>
+        <button
+          className={`clear-btn${pressedBtn === 'clear' ? ' key-pressed' : ''}`}
+          onClick={handleClear}
+          disabled={betAmount === 0}
+        >
+          Clear
+          {showHints && <span className="hotkey-hint">C</span>}
+        </button>
       </div>
       <div className="betting-row betting-row-actions">
-        <button className="deal-btn" onClick={handleDeal} disabled={betAmount === 0 || betAmount > bankroll}>
+        <button
+          className={`deal-btn${pressedBtn === 'deal' ? ' key-pressed' : ''}`}
+          onClick={handleDeal}
+          disabled={betAmount === 0 || betAmount > bankroll}
+        >
           Place Bet →
+          {showHints && <span className="hotkey-hint hotkey-hint-wide">Space</span>}
         </button>
       </div>
     </div>
@@ -235,7 +323,7 @@ function BettingPanel({ bankroll, onBet, defaultBet = 0 }) {
 
 // ── Action buttons ────────────────────────────────────────────────────────────
 
-function ActionButtons({ player, send }) {
+function ActionButtons({ player, send, pressedAction, showHotkeys = true }) {
   const hand = player.hand;
   const hasSplitWaiting = player.splitHand && player.splitHand.length > 0;
   const alreadySplit = player.hand1Completed && player.hand1Completed.length > 0;
@@ -246,22 +334,45 @@ function ActionButtons({ player, send }) {
 
   return (
     <div className="action-buttons-wrapper">
-      <button className="action-btn btn-hit" disabled={!canHit} onClick={() => { if (canHit) { playSound('draw'); send({ type: 'player:hit' }); } }}>
-        Hit <kbd className="key-hint">W</kbd>
+      <button
+        className={`action-btn btn-hit${pressedAction === 'hit' ? ' key-pressed' : ''}`}
+        disabled={!canHit}
+        onClick={() => { if (canHit) { playSound('draw'); send({ type: 'player:hit' }); } }}
+      >
+        Hit
+        {showHotkeys && <span className="hotkey-hint">W</span>}
       </button>
-      <button className="action-btn btn-stand" onClick={() => send({ type: 'player:stand' })}>
-        Stand <kbd className="key-hint">S</kbd>
+      <button
+        className={`action-btn btn-stand${pressedAction === 'stand' ? ' key-pressed' : ''}`}
+        onClick={() => send({ type: 'player:stand' })}
+      >
+        Stand
+        {showHotkeys && <span className="hotkey-hint">S</span>}
       </button>
-      <button className="action-btn btn-double" disabled={!canDouble} onClick={() => { if (canDouble) send({ type: 'player:double' }); }}>
-        Double <kbd className="key-hint">D</kbd>
+      <button
+        className={`action-btn btn-double${pressedAction === 'double' ? ' key-pressed' : ''}`}
+        disabled={!canDouble}
+        onClick={() => { if (canDouble) send({ type: 'player:double' }); }}
+      >
+        Double
+        {showHotkeys && <span className="hotkey-hint">D</span>}
       </button>
       {canSplit && (
-        <button className="action-btn btn-split" onClick={() => send({ type: 'player:split' })}>
-          Split <kbd className="key-hint">A</kbd>
+        <button
+          className={`action-btn btn-split${pressedAction === 'split' ? ' key-pressed' : ''}`}
+          onClick={() => send({ type: 'player:split' })}
+        >
+          Split
+          {showHotkeys && <span className="hotkey-hint">A</span>}
         </button>
       )}
-      <button className="action-btn btn-resign" disabled={!canResign} onClick={() => { if (canResign) send({ type: 'player:resign' }); }}>
-        Resign <kbd className="key-hint">R</kbd>
+      <button
+        className={`action-btn btn-resign${pressedAction === 'resign' ? ' key-pressed' : ''}`}
+        disabled={!canResign}
+        onClick={() => { if (canResign) send({ type: 'player:resign' }); }}
+      >
+        Resign
+        {showHotkeys && <span className="hotkey-hint">R</span>}
       </button>
     </div>
   );
@@ -269,7 +380,7 @@ function ActionButtons({ player, send }) {
 
 // ── Main table component ──────────────────────────────────────────────────────
 
-export default function MultiplayerTable({ gameState, playerId, send, onLeave, volumeOn, onVolumeChange, volumeLevel = 1, onVolumeLevelChange, rebetEnabled = true, onRebetChange, onApproveJoin, onRemoveSpectator, onResetLobby }) {
+export default function MultiplayerTable({ gameState, playerId, send, onLeave, volumeOn, onVolumeChange, volumeLevel = 1, onVolumeLevelChange, rebetEnabled = true, onRebetChange, showHotkeys = true, onShowHotkeysChange, onApproveJoin, onRemoveSpectator, onResetLobby }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [lastBetAmount, setLastBetAmount] = useState(0);
   const menuRef = useRef(null);
@@ -287,30 +398,90 @@ export default function MultiplayerTable({ gameState, playerId, send, onLeave, v
   const isLocalPlayerTurn = status === 'playing' && currentPlayerIndex === localPlayerIndex && localPlayer?.handStatus === 'acting';
   const isLocalBetting = status === 'betting' && localPlayer?.handStatus === 'betting';
 
-  // Keyboard shortcuts
+  const currentActor = status === 'playing' && currentPlayerIndex >= 0 ? players[currentPlayerIndex] : null;
+  const isFeaturedOther = !!currentActor && currentActor.id !== playerId;
+  const featuredPlayer = isFeaturedOther ? currentActor : localPlayer;
+
+  // The center stage always shows whoever is actually featured right now — no
+  // artificial delay holding the view on the previous player. displayedPlayer just
+  // tracks the live players array so hits/etc. update instantly as they're broadcast.
+  const displayedPlayer = featuredPlayer;
+  const isDisplayedOther = isFeaturedOther;
+
+  // The moment the round enters the dealer phase, hold on your own hand (featuredPlayer
+  // already resolves to localPlayer here, shown immediately) for a beat before letting
+  // the dealer's turn take over the center stage.
+  const [dealerPending, setDealerPending] = useState(false);
+  const dealerPendingTimeoutRef = useRef(null);
+
   useEffect(() => {
-    if (!isLocalPlayerTurn) return;
+    clearTimeout(dealerPendingTimeoutRef.current);
+    if (status !== 'dealer') {
+      setDealerPending(false);
+      return;
+    }
+    setDealerPending(true);
+    dealerPendingTimeoutRef.current = setTimeout(() => setDealerPending(false), DEALER_START_PAUSE_MS);
+    return () => clearTimeout(dealerPendingTimeoutRef.current);
+  }, [status]);
+
+  // Your hand becomes visible the instant it's your turn, but Hit/Stand/etc. stay
+  // disabled for a short cooldown after that — a deliberate beat before you can act,
+  // not a delay on when you get to see your own cards.
+  const [canAct, setCanAct] = useState(false);
+  const actCooldownRef = useRef(null);
+
+  useEffect(() => {
+    clearTimeout(actCooldownRef.current);
+    if (!isLocalPlayerTurn) {
+      setCanAct(false);
+      return;
+    }
+    setCanAct(false);
+    actCooldownRef.current = setTimeout(() => setCanAct(true), LOCAL_ACT_COOLDOWN_MS);
+    return () => clearTimeout(actCooldownRef.current);
+  }, [isLocalPlayerTurn]);
+
+  // Keyboard shortcuts
+  const [pressedAction, setPressedAction] = useState(null);
+  const pressedActionTimeoutRef = useRef(null);
+
+  const flashPressedAction = useCallback((action) => {
+    clearTimeout(pressedActionTimeoutRef.current);
+    setPressedAction(action);
+    pressedActionTimeoutRef.current = setTimeout(() => setPressedAction(null), 180);
+  }, []);
+
+  useEffect(() => () => clearTimeout(pressedActionTimeoutRef.current), []);
+
+  useEffect(() => {
+    if (!canAct) return;
     const onKey = (e) => {
       if (e.target.tagName === 'INPUT') return;
       const k = e.key.toLowerCase();
       const p = players[localPlayerIndex];
       if (k === 'w') {
-        if (p && getHandTotal(p.hand) < 21) { playSound('draw'); send({ type: 'player:hit' }); }
+        if (p && getHandTotal(p.hand) < 21) { flashPressedAction('hit'); playSound('draw'); send({ type: 'player:hit' }); }
       } else if (k === 's') {
+        flashPressedAction('stand');
         send({ type: 'player:stand' });
       } else if (k === 'd') {
-        if (p?.hand.length === 2 && p.bankroll >= p.bet) send({ type: 'player:double' });
+        if (p?.hand.length === 2 && p.bankroll >= p.bet) { flashPressedAction('double'); send({ type: 'player:double' }); }
       } else if (k === 'a') {
-        if (p?.hand.length === 2 && p.hand[0]?.value === p.hand[1]?.value && !p.splitHand && !p.hand1Completed && p.bankroll >= p.bet)
+        if (p?.hand.length === 2 && p.hand[0]?.value === p.hand[1]?.value && !p.splitHand && !p.hand1Completed && p.bankroll >= p.bet) {
+          flashPressedAction('split');
           send({ type: 'player:split' });
+        }
       } else if (k === 'r') {
-        if (p?.hand.length === 2 && !p.splitHand && !p.hand1Completed)
+        if (p?.hand.length === 2 && !p.splitHand && !p.hand1Completed) {
+          flashPressedAction('resign');
           send({ type: 'player:resign' });
+        }
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [isLocalPlayerTurn, send, players, localPlayerIndex]);
+  }, [canAct, send, players, localPlayerIndex, flashPressedAction]);
 
   // Close menu on outside click
   useEffect(() => {
@@ -377,6 +548,15 @@ export default function MultiplayerTable({ gameState, playerId, send, onLeave, v
                     onClick={() => onRebetChange?.(!rebetEnabled)}
                   >
                     {rebetEnabled ? 'ON' : 'OFF'}
+                  </button>
+                </div>
+                <div className="menu-row">
+                  <span className="menu-label">Show Hotkeys</span>
+                  <button
+                    className={`menu-toggle${showHotkeys ? ' menu-toggle-on' : ''}`}
+                    onClick={() => onShowHotkeysChange?.(!showHotkeys)}
+                  >
+                    {showHotkeys ? 'ON' : 'OFF'}
                   </button>
                 </div>
               </div>
@@ -503,10 +683,14 @@ export default function MultiplayerTable({ gameState, playerId, send, onLeave, v
             </div>
 
             {/* Dealer */}
-            <MultiDealerHand hand={dealerHand} holeHidden={dealerHoleHidden} />
+            <MultiDealerHand hand={dealerHand} holeHidden={dealerPending ? true : dealerHoleHidden} />
 
-            {/* Local player — full-size cards, same as singleplayer */}
-            <LocalPlayerHand player={localPlayer} status={status} />
+            {/* Featured hand — the current actor's live hand, or your own when it's your turn / off-turn phases.
+                Updates immediately, no swap delay, and stays visible continuously through the dealer phase
+                (no hide/reappear) — only the dealer's own hole-card reveal is paced by dealerPending above. */}
+            <div className="mp-featured-hand-slot">
+              <FeaturedPlayerHand player={displayedPlayer} status={status} isOther={isDisplayedOther} />
+            </div>
           </div>
 
           {/* ── Controls bar ── */}
@@ -529,7 +713,7 @@ export default function MultiplayerTable({ gameState, playerId, send, onLeave, v
             <>
             {isLocalBetting && (
               <div className="betting-controls">
-                <BettingPanel bankroll={localPlayer.bankroll} onBet={handleBet} defaultBet={rebetEnabled ? lastBetAmount : 0} />
+                <BettingPanel bankroll={localPlayer.bankroll} onBet={handleBet} defaultBet={rebetEnabled ? lastBetAmount : 0} showHotkeys={showHotkeys} />
               </div>
             )}
 
@@ -539,16 +723,18 @@ export default function MultiplayerTable({ gameState, playerId, send, onLeave, v
               </div>
             )}
 
-            {isLocalPlayerTurn && localPlayer && (
-              <ActionButtons player={localPlayer} send={send} />
+            {canAct && localPlayer && (
+              <ActionButtons player={localPlayer} send={send} pressedAction={pressedAction} showHotkeys={showHotkeys} />
             )}
 
-            {status === 'playing' && !isLocalPlayerTurn && (
+            {status === 'playing' && !canAct && (
               <div className="mp-waiting-indicator">
                 <span className="mp-turn-label">
-                  {currentPlayerIndex >= 0 && players[currentPlayerIndex]
-                    ? `${players[currentPlayerIndex].name}'s turn`
-                    : 'Waiting…'}
+                  {isLocalPlayerTurn
+                    ? 'Your turn starting…'
+                    : currentPlayerIndex >= 0 && players[currentPlayerIndex]
+                      ? `${players[currentPlayerIndex].name}'s turn`
+                      : 'Waiting…'}
                 </span>
               </div>
             )}

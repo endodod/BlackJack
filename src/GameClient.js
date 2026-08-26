@@ -176,6 +176,8 @@ export default function GameClient({ initialStats }) {
             onVolumeLevelChange={handleVolumeLevelChange}
             rebetEnabled={rebetEnabled}
             onRebetChange={handleRebetChange}
+            showHotkeys={showHotkeys}
+            onShowHotkeysChange={handleShowHotkeysChange}
           />
         </div>
       )}

@@ -760,7 +760,7 @@ export default class BlackjackParty {
       }
 
       this.startNewRound();
-    }, 5000);
+    }, 4000);
   }
 
   startNewRound() {

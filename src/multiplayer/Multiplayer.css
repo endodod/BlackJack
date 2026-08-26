@@ -894,7 +894,21 @@
   flex-shrink: 0;
 }
 
-/* ── Local player (full-size, mirrors singleplayer) ──────── */
+/* ── Featured hand (current actor, full-size, mirrors singleplayer) ──────── */
+
+.mp-featured-hand-slot {
+  display: flex;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.mp-featured-hand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6em;
+  flex-shrink: 0;
+}
 
 .mp-local-hand {
   flex-shrink: 0;
@@ -918,6 +932,23 @@
 .mp-local-result-win  { background: rgba(34,197,94,0.15);  color: #22c55e; border: 1px solid rgba(34,197,94,0.4); }
 .mp-local-result-lose { background: rgba(239,68,68,0.13);  color: #f87171; border: 1px solid rgba(239,68,68,0.35); }
 .mp-local-result-push { background: rgba(245,158,11,0.12); color: #f59e0b; border: 1px solid rgba(245,158,11,0.35); }
+
+/* ── Spotlight label: the name/total line turns green while featuring another
+   player's hand, instead of a separate "X's Turn" banner ─────────────────── */
+
+.hand-label-spotlight {
+  color: #22c55e;
+}
+
+.hand-label-spotlight .hand-total {
+  background-color: rgba(34, 197, 94, 0.18);
+  color: #22c55e;
+}
+
+.hand-label-spotlight .hand-total-bust {
+  background-color: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
 
 /* Fixed-size window for each other player */
 .mp-other-window {
@@ -1240,47 +1271,52 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.9em;
+  gap: 0.5em;
 }
 
 .mp-round-end-results {
   display: grid;
   grid-template-columns: max-content auto;
-  column-gap: 1em;
-  row-gap: 0.5em;
+  column-gap: 0.6em;
+  row-gap: 0.3em;
   align-items: center;
   background: rgba(0,0,0,0.35);
   border: 1px solid rgba(255,255,255,0.09);
-  border-radius: 12px;
-  padding: 0.9em 1.4em;
+  border-radius: 10px;
+  padding: 0.5em 0.85em;
 }
 
 .mp-round-result-name {
   color: rgba(255,255,255,0.55);
   font-weight: 600;
-  font-size: 0.9em;
+  font-size: 0.72em;
   white-space: nowrap;
 }
 
 .mp-round-result-outcomes {
   display: flex;
   align-items: center;
-  gap: 0.4em;
+  gap: 0.3em;
+}
+
+.mp-round-end-results .mp-slot-result-badge {
+  font-size: 0.55em;
+  padding: 0.08em 0.4em;
 }
 
 .mp-round-result-sep {
   color: rgba(255,255,255,0.2);
-  font-size: 0.78em;
+  font-size: 0.65em;
 }
 
 .mp-round-result-none {
   color: rgba(255,255,255,0.2);
-  font-size: 0.85em;
+  font-size: 0.7em;
 }
 
 .mp-next-round-hint {
   margin: 0;
-  font-size: 0.8em;
+  font-size: 0.68em;
   color: rgba(255,255,255,0.25);
   animation: waitingPulse 1.4s ease-in-out infinite;
 }
