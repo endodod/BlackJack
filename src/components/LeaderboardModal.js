@@ -93,12 +93,12 @@ export default function LeaderboardModal({ onClose }) {
           ))}
         </div>
 
-        <p className="lb-filter-note" style={{ visibility: active === 'resets' ? 'hidden' : 'visible' }}>
+        <p className="lb-filter-note">
           {active === 'income'
-            ? 'Minimum 10 hands played to qualify'
+            ? 'Minimum 5 hands played to qualify'
             : active === 'training'
-            ? 'Minimum 10 training hands to qualify'
-            : ' '}
+            ? 'Minimum 5 training hands to qualify'
+            : 'Amount of bankroll resets in freeplay'}
         </p>
 
         <div className="lb-list">

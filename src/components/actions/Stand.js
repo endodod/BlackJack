@@ -1,7 +1,7 @@
 'use client'
 import { useDeck } from "../../context/DeckContext";
 
-export default function Stand({ onValidate, onStand }) {
+export default function Stand({ onValidate, onStand, pressed, showHotkeys = true }) {
     const { setPlayerTurn } = useDeck();
 
     const handleStand = () => {
@@ -14,6 +14,9 @@ export default function Stand({ onValidate, onStand }) {
     };
 
     return (
-        <button className="action-btn btn-stand" onClick={handleStand}>Stand <kbd className="key-hint">S</kbd></button>
+        <button className={`action-btn btn-stand${pressed ? ' key-pressed' : ''}`} onClick={handleStand}>
+            Stand
+            {showHotkeys && <span className="hotkey-hint">S</span>}
+        </button>
     )
 }

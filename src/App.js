@@ -17,7 +17,7 @@ import Link from 'next/link';
 
 // gamePhase values: 'betting' | 'dealing' | 'player' | 'dealer' | 'pausing' | 'result'
 
-function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIncome: 0, blackjacks: 0, trainingHands: 0, trainingCorrect: 0 }, onRoundEnd, onReset, onShowAuth, volumeOn, onVolumeChange, volumeLevel = 1, onVolumeLevelChange, rebetEnabled = true, onRebetChange, onSwitchToMultiplayer }) {
+function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIncome: 0, blackjacks: 0, trainingHands: 0, trainingCorrect: 0 }, onRoundEnd, onReset, onShowAuth, volumeOn, onVolumeChange, volumeLevel = 1, onVolumeLevelChange, rebetEnabled = true, onRebetChange, showHotkeys = true, onShowHotkeysChange, onSwitchToMultiplayer }) {
   const { data: session } = useSession();
 
   // ── UI-only state ────────────────────────────────────────────────────────────
@@ -61,7 +61,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
     resultMessage, resultAmount, splitResults,
     strategyStats, trainingFeedback, actionFeedback,
     isSplitActive, isOutOfMoney, hasSplitPair, canSplit, canDouble, canResign,
-    splitHand2, splitHand1Completed, splitBet, splitHand1Bet,
+    splitHand2, splitHand1Completed, splitBet, splitHand1Bet, pressedAction,
     playerHand, dealerHand, bankroll, currentBet,
     dealCards, cancelHand, handleDouble, handleStand, handleSplit, handleResign,
     handleReset, handleResultsClose, handleActionValidation,
@@ -241,6 +241,15 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
                     {rebetEnabled ? 'ON' : 'OFF'}
                   </button>
                 </div>
+                <div className="menu-row">
+                  <span className="menu-label">Show Hotkeys</span>
+                  <button
+                    className={`menu-toggle${showHotkeys ? ' menu-toggle-on' : ''}`}
+                    onClick={() => onShowHotkeysChange?.(!showHotkeys)}
+                  >
+                    {showHotkeys ? 'ON' : 'OFF'}
+                  </button>
+                </div>
                 {session?.user?.username && (
                   <Link
                     href="/profile"
@@ -404,7 +413,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
                   onDealerSelect={setTestDealerHand}
                 />
               )}
-              <BettingPanel onDeal={dealCards} defaultBet={rebetEnabled ? lastBetAmount : 0} />
+              <BettingPanel onDeal={dealCards} defaultBet={rebetEnabled ? lastBetAmount : 0} showHotkeys={showHotkeys} />
             </div>
           )}
           {gamePhase === 'player' && !statusMessage && (
@@ -419,6 +428,8 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
               onResign={handleResign}
               onValidate={trainingMode === 'basic' ? handleActionValidation : undefined}
               actionFeedback={actionFeedback}
+              pressedAction={pressedAction}
+              showHotkeys={showHotkeys}
             />
           )}
           {gamePhase === 'training-result' && trainingFeedback && (

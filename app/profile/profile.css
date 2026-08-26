@@ -97,6 +97,8 @@
 
 .profile-stat-label {
   font-size: 0.75em;
+  line-height: 1.2;
+  min-height: 2.4em;
   color: rgba(255, 255, 255, 0.4);
   font-weight: 600;
   text-transform: uppercase;

@@ -160,7 +160,7 @@ export default function ProfilePage() {
             onClick={handleReset}
             disabled={loading.reset}
           >
-            {loading.reset ? 'Resetting…' : 'Reset Game'}
+            {loading.reset ? 'Resetting…' : 'Reset Bankroll'}
           </button>
           {msg.reset?.success && <p className="profile-msg-ok">Game reset — redirecting…</p>}
           {msg.reset?.error && <p className="profile-msg-err">{msg.reset.error}</p>}

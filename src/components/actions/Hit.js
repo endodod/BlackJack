@@ -3,7 +3,7 @@ import { useDeck } from "../../context/DeckContext";
 import drawCard from "../../logic/drawCard";
 import { playSound } from "../../lib/sound";
 
-export default function Hit({ onValidate }) {
+export default function Hit({ onValidate, pressed, showHotkeys = true }) {
     const { deck, playerHand, setPlayerHand, setDeck, playerTurn } = useDeck();
 
     const handleHit = () => {
@@ -20,6 +20,9 @@ export default function Hit({ onValidate }) {
     };
 
     return (
-        <button className="action-btn btn-hit" onClick={handleHit}>Hit <kbd className="key-hint">W</kbd></button>
+        <button className={`action-btn btn-hit${pressed ? ' key-pressed' : ''}`} onClick={handleHit}>
+            Hit
+            {showHotkeys && <span className="hotkey-hint">W</span>}
+        </button>
     )
 }

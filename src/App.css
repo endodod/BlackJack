@@ -907,6 +907,7 @@ html.window-1536x703 .table-area {
 /* ── Action Buttons (Hit / Stand / Double / Split) ───── */
 
 .action-btn {
+  position: relative;
   border: none;
   padding: 0.9em 2.4em;
   margin: 0.4em;
@@ -968,23 +969,74 @@ html.window-1536x703 .table-area {
 
 /* ── Keybind Badge ───────────────────────────────────── */
 
-kbd.key-hint {
-  display: inline-block;
-  font-family: inherit;
-  font-size: 0.58em;
+.hotkey-hint {
+  position: absolute;
+  top: -0.4em;
+  right: -0.4em;
+  min-width: 1.5em;
+  height: 1.5em;
+  padding: 0 0.15em;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.75);
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  color: #fff;
+  font-size: 0.62em;
   font-weight: 700;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  border-bottom-width: 2px;
-  border-radius: 3px;
-  padding: 0.1em 0.38em;
-  margin-left: 0.4em;
-  vertical-align: middle;
-  line-height: 1.5;
-  letter-spacing: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-shadow: none;
+  pointer-events: none;
 }
 
-.action-btn:disabled kbd.key-hint {
+.hotkey-hint-wide {
+  border-radius: 999px;
+  min-width: auto;
+  padding: 0 0.6em;
+}
+
+@keyframes hotkey-press {
+  0% { transform: scale(1); }
+  45% { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+
+.key-pressed {
+  animation: hotkey-press 0.18s ease;
+}
+
+.action-btn .hotkey-hint {
+  top: -0.5em;
+  right: -0.5em;
+}
+
+@media (max-width: 929px) {
+  .hotkey-hint { display: none; }
+}
+
+kbd.key-hint {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+  font-size: 0.62em;
+  font-weight: 700;
+  min-width: 1.5em;
+  height: 1.5em;
+  background: rgba(0, 0, 0, 0.75);
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  border-radius: 50%;
+  padding: 0 0.15em;
+  margin-left: 0.4em;
+  vertical-align: middle;
+  line-height: 1;
+  letter-spacing: 0;
+  color: #fff;
+  text-shadow: none;
+}
+
+.action-btn:disabled kbd.key-hint,
+.action-btn:disabled .hotkey-hint {
   opacity: 0.4;
 }
 

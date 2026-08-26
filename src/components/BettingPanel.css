@@ -36,6 +36,7 @@
  *   box-shadow inset: gloss highlight
  */
 .chip-button {
+  position: relative;
   border-radius: 50%;
   width: 4.4em;
   height: 4.4em;
@@ -49,6 +50,18 @@
   border-style: solid;
   border-width: 5px;
   outline: none;
+}
+
+/* Base .hotkey-hint / .key-pressed styles live in App.css (shared with action buttons) */
+
+.clear-btn .hotkey-hint {
+  top: -0.55em;
+  right: -0.55em;
+}
+
+.deal-btn .hotkey-hint {
+  top: -0.6em;
+  right: -0.6em;
 }
 
 /* $10 — red */
@@ -143,6 +156,7 @@
 }
 
 .clear-btn {
+  position: relative;
   background-color: rgba(255, 255, 255, 0.07);
   color: rgba(255, 255, 255, 0.65);
   border: 1.5px solid rgba(255, 255, 255, 0.16);
@@ -183,6 +197,7 @@
 }
 
 .deal-btn {
+  position: relative;
   background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
   color: #fff;
   border: none;

@@ -14,6 +14,7 @@ export default function GameClient({ initialStats }) {
   const [volumeOn, setVolumeOn] = useState(true)
   const [volumeLevel, setVolLevel] = useState(1)
   const [rebetEnabled, setRebetEnabled] = useState(true)
+  const [showHotkeys, setShowHotkeys] = useState(true)
   const [userId, setUserId] = useState(session?.user?.id ?? null)
   const [dbStats, setDbStats] = useState(initialStats !== undefined ? initialStats : undefined)
   const saveTimer = useRef(null)
@@ -34,6 +35,10 @@ export default function GameClient({ initialStats }) {
       const storedRebet = localStorage.getItem('rebetEnabled')
       if (storedRebet !== null) {
         setRebetEnabled(storedRebet === 'true')
+      }
+      const storedShowHotkeys = localStorage.getItem('showHotkeys')
+      if (storedShowHotkeys !== null) {
+        setShowHotkeys(storedShowHotkeys === 'true')
       }
     }
   }, [])
@@ -117,6 +122,13 @@ export default function GameClient({ initialStats }) {
     }
   }, [])
 
+  const handleShowHotkeysChange = useCallback((val) => {
+    setShowHotkeys(val)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('showHotkeys', val.toString())
+    }
+  }, [])
+
   // Fallback while session or stats are still resolving (should be near-instant with server prefetch)
   if (status === 'loading' || (status === 'authenticated' && dbStats === undefined)) {
     return <div style={{ background: '#08080e', minHeight: '100vh' }} />
@@ -148,6 +160,8 @@ export default function GameClient({ initialStats }) {
             onVolumeLevelChange={handleVolumeLevelChange}
             rebetEnabled={rebetEnabled}
             onRebetChange={handleRebetChange}
+            showHotkeys={showHotkeys}
+            onShowHotkeysChange={handleShowHotkeysChange}
             onSwitchToMultiplayer={() => setMode('multiplayer')}
           />
         </DeckProvider>

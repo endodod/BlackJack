@@ -99,6 +99,8 @@ export function useBlackjackGame({
   const [splitBet, setSplitBet]                       = useState(0);
   const [splitHand1Bet, setSplitHand1Bet]             = useState(0);
   const [splitResults, setSplitResults]               = useState(null);
+  const [pressedAction, setPressedAction]             = useState(null);
+  const pressedActionTimeoutRef = useRef(null);
 
   // Refs
   const bankrollRef        = useRef(bankroll);
@@ -321,9 +323,9 @@ export function useBlackjackGame({
   }, [expectedAction, onRoundEnd]);
 
   const handleDouble = useCallback(() => {
-    if (playerHand.length !== 2 || (trainingModeRef.current !== 'basic' && currentBet > bankroll) || deck.length === 0) return;
+    if (playerHand.length !== 2 || (trainingModeRef.current !== 'basic' && currentBet > bankroll) || deck.length === 0) return false;
     handleActionValidation('double');
-    if (trainingModeRef.current === 'basic') return;
+    if (trainingModeRef.current === 'basic') return true;
     playSound('chip');
     setBankroll(prev => prev - currentBet);
     setCurrentBet(prev => prev * 2);
@@ -333,6 +335,7 @@ export function useBlackjackGame({
       setTimeout(() => { setPlayerHand(updatedHand); setDeck(updatedDeck); }, 500);
       setTimeout(() => setPlayerTurn(false), 1150);
     }, 200);
+    return true;
   }, [playerHand, currentBet, bankroll, deck, setBankroll, setCurrentBet, setPlayerHand, setDeck, setPlayerTurn,
       handleActionValidation]);
 
@@ -351,9 +354,9 @@ export function useBlackjackGame({
       isAlreadySplit ||
       deck.length < 2 ||
       (trainingModeRef.current !== 'basic' && currentBet > bankroll)
-    ) return;
+    ) return false;
     handleActionValidation('split');
-    if (trainingModeRef.current === 'basic') return;
+    if (trainingModeRef.current === 'basic') return true;
     const [card1, card2] = playerHand;
     const newCard1 = deck[0];
     const newCard2 = deck[1];
@@ -364,13 +367,14 @@ export function useBlackjackGame({
     setSplitHand2([card2]);
     setTimeout(() => { playSound('draw'); setPlayerHand([card1, newCard1]); }, 650);
     setTimeout(() => { playSound('draw'); setSplitHand2([card2, newCard2]); }, 1300);
+    return true;
   }, [playerHand, splitHand2, splitHand1Completed, currentBet, bankroll, deck, setBankroll, setDeck, setPlayerHand,
       handleActionValidation]);
 
   const handleResign = useCallback(() => {
-    if (playerHand.length !== 2 || splitHand2.length > 0 || splitHand1Completed.length > 0) return;
+    if (playerHand.length !== 2 || splitHand2.length > 0 || splitHand1Completed.length > 0) return false;
     handleActionValidation('resign');
-    if (trainingModeRef.current === 'basic') return;
+    if (trainingModeRef.current === 'basic') return true;
 
     const handId = handIdRef.current;
     const dealerTotal = getHandTotal(dealerHand);
@@ -424,6 +428,7 @@ export function useBlackjackGame({
         setGamePhase('result');
       }, 1500);
     }
+    return true;
   }, [playerHand, splitHand2, splitHand1Completed, dealerHand, currentBet, earlyResign,
       setBankroll, setPlayerTurn, resolveRound, handleActionValidation, onRoundEnd]);
 
@@ -653,6 +658,14 @@ export function useBlackjackGame({
 
   // ── Hotkeys ──────────────────────────────────────────────────────────────────
 
+  const flashPressedAction = useCallback((action) => {
+    clearTimeout(pressedActionTimeoutRef.current);
+    setPressedAction(action);
+    pressedActionTimeoutRef.current = setTimeout(() => setPressedAction(null), 180);
+  }, []);
+
+  useEffect(() => () => clearTimeout(pressedActionTimeoutRef.current), []);
+
   useEffect(() => {
     const handleKeyPress = (event) => {
       if (gamePhase !== 'player') return;
@@ -661,6 +674,7 @@ export function useBlackjackGame({
       switch (key) {
         case 'w':
           if (deck.length > 0) {
+            flashPressedAction('hit');
             handleActionValidation('hit');
             if (trainingModeRef.current !== 'basic') {
               const { updatedHand, updatedDeck } = drawCard({ hand: playerHand, deck });
@@ -671,21 +685,22 @@ export function useBlackjackGame({
           }
           break;
         case 's':
+          flashPressedAction('stand');
           handleActionValidation('stand');
           if (trainingModeRef.current !== 'basic') {
             playSound('stand');
             setTimeout(() => setPlayerTurn(false), 500);
           }
           break;
-        case 'd': handleDouble(); break;
-        case 'a': handleSplit(); break;
-        case 'r': handleResign(); break;
+        case 'd': if (handleDouble()) flashPressedAction('double'); break;
+        case 'a': if (handleSplit()) flashPressedAction('split'); break;
+        case 'r': if (handleResign()) flashPressedAction('resign'); break;
         default: break;
       }
     };
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [gamePhase, playerHand, deck, handleDouble, handleSplit, handleResign, setPlayerHand, setDeck, setPlayerTurn, handleActionValidation]);
+  }, [gamePhase, playerHand, deck, handleDouble, handleSplit, handleResign, setPlayerHand, setDeck, setPlayerTurn, handleActionValidation, flashPressedAction]);
 
   // ── Suspend sounds while the round result is on screen ───────────────────────
 
@@ -729,7 +744,7 @@ export function useBlackjackGame({
     // State
     gamePhase, winner, resultAmount, resultMessage, statusMessage, lastBetAmount,
     stats, strategyStats, expectedAction, actionFeedback, trainingFeedback,
-    splitHand2, splitHand1Completed, splitBet, splitHand1Bet, splitResults,
+    splitHand2, splitHand1Completed, splitBet, splitHand1Bet, splitResults, pressedAction,
     // DeckContext values (re-exported for convenience)
     playerHand, dealerHand, bankroll, currentBet,
     // Derived

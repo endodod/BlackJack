@@ -48,12 +48,16 @@ function renderPanel({ bankroll = 1000, onDeal = jest.fn(), defaultBet = 0 } = {
 }
 
 // Exact chip name matchers (avoid /\$10/ matching $100, $1000 etc.)
+// Match against the .chip-amount span only, since the button may also
+// render a desktop-only hotkey hint badge (e.g. "1") alongside the amount.
+const chipAmount = (el) => (el.querySelector('.chip-amount') || el).textContent.trim()
 const chip = {
-  $10:  (el) => el.textContent.trim() === '$10',
-  $25:  (el) => el.textContent.trim() === '$25',
-  $100: (el) => el.textContent.trim() === '$100',
-  $500: (el) => el.textContent.trim() === '$500',
+  $10:  (el) => chipAmount(el) === '$10',
+  $25:  (el) => chipAmount(el) === '$25',
+  $100: (el) => chipAmount(el) === '$100',
+  $500: (el) => chipAmount(el) === '$500',
 }
+const getChipButtons = () => screen.getAllByRole('button').filter(b => b.classList.contains('chip-button'))
 
 describe('UI / STATE CONSISTENCY — BettingPanel', () => {
   describe('initial state', () => {
@@ -69,20 +73,18 @@ describe('UI / STATE CONSISTENCY — BettingPanel', () => {
 
     it('renders all four quick-bet chip buttons', () => {
       renderPanel()
-      const btns = screen.getAllByRole('button', { name: /chip|^\$/ })
       // All 4 chip buttons should be in the DOM
-      const chipButtons = screen.getAllByRole('button').filter(b => /^\$\d+$/.test(b.textContent.trim()))
+      const chipButtons = getChipButtons()
       expect(chipButtons).toHaveLength(4)
     })
 
     it('all four chip values are present: $10, $25, $100, $500', () => {
       renderPanel({ bankroll: 1000 })
-      const allButtons = screen.getAllByRole('button')
-      const texts = allButtons.map(b => b.textContent.trim())
-      expect(texts).toContain('$10')
-      expect(texts).toContain('$25')
-      expect(texts).toContain('$100')
-      expect(texts).toContain('$500')
+      const amounts = getChipButtons().map(chipAmount)
+      expect(amounts).toContain('$10')
+      expect(amounts).toContain('$25')
+      expect(amounts).toContain('$100')
+      expect(amounts).toContain('$500')
     })
   })
 
@@ -94,21 +96,21 @@ describe('UI / STATE CONSISTENCY — BettingPanel', () => {
 
     it('cannot start game with bet > balance — chip disabled, Deal disabled', () => {
       renderPanel({ bankroll: 50 })
-      const chipButtons = screen.getAllByRole('button').filter(b => /^\$\d+$/.test(b.textContent.trim()))
+      const chipButtons = getChipButtons()
       const btn100 = chipButtons.find(chip.$100)
       expect(btn100).toBeDisabled()
     })
 
     it('chip button disabled when adding it would exceed bankroll', () => {
       renderPanel({ bankroll: 30 })
-      const chipButtons = screen.getAllByRole('button').filter(b => /^\$\d+$/.test(b.textContent.trim()))
+      const chipButtons = getChipButtons()
       expect(chipButtons.find(chip.$100)).toBeDisabled()
       expect(chipButtons.find(chip.$500)).toBeDisabled()
     })
 
     it('Deal button enabled after valid bet placed', () => {
       renderPanel({ bankroll: 1000 })
-      const chipBtns = screen.getAllByRole('button').filter(b => b.textContent.trim() === '$10')
+      const chipBtns = getChipButtons().filter(chip.$10)
       fireEvent.click(chipBtns[0])
       expect(screen.getByRole('button', { name: /deal/i })).not.toBeDisabled()
     })
@@ -127,15 +129,15 @@ describe('UI / STATE CONSISTENCY — BettingPanel', () => {
   describe('chip button interactions', () => {
     it('clicking $10 chip increases bet display to $10', () => {
       renderPanel({ bankroll: 1000 })
-      const ten = screen.getAllByRole('button').find(chip.$10)
+      const ten = getChipButtons().find(chip.$10)
       fireEvent.click(ten)
-      // Use selector:'span' because both the chip button and bet-display span show '$10'
-      expect(screen.getByText('$10', { selector: 'span' })).toBeInTheDocument()
+      // Scope to .bet-amount since a chip button's own .chip-amount span also reads '$10'
+      expect(screen.getByText('$10', { selector: '.bet-amount' })).toBeInTheDocument()
     })
 
     it('clicking chips accumulates the bet ($25 + $25 = $50)', () => {
       renderPanel({ bankroll: 1000 })
-      const twenty5 = screen.getAllByRole('button').find(chip.$25)
+      const twenty5 = getChipButtons().find(chip.$25)
       fireEvent.click(twenty5)
       fireEvent.click(twenty5)
       expect(screen.getByText('$50')).toBeInTheDocument()
@@ -143,13 +145,13 @@ describe('UI / STATE CONSISTENCY — BettingPanel', () => {
 
     it('chip disabled when adding it would exceed bankroll', () => {
       renderPanel({ bankroll: 15 })
-      const chipButtons = screen.getAllByRole('button').filter(b => /^\$\d+$/.test(b.textContent.trim()))
+      const chipButtons = getChipButtons()
       expect(chipButtons.find(chip.$25)).toBeDisabled()
     })
 
     it('very large bet near balance — $500 chip enabled when bankroll = 500', () => {
       renderPanel({ bankroll: 500 })
-      const btn500 = screen.getAllByRole('button').find(chip.$500)
+      const btn500 = getChipButtons().find(chip.$500)
       expect(btn500).not.toBeDisabled()
     })
   })
@@ -162,7 +164,7 @@ describe('UI / STATE CONSISTENCY — BettingPanel', () => {
 
     it('Clear button resets bet to $0', () => {
       renderPanel({ bankroll: 1000 })
-      const twenty5 = screen.getAllByRole('button').find(chip.$25)
+      const twenty5 = getChipButtons().find(chip.$25)
       fireEvent.click(twenty5)
       fireEvent.click(screen.getByRole('button', { name: /clear/i }))
       expect(screen.getByText('$0')).toBeInTheDocument()
@@ -170,7 +172,7 @@ describe('UI / STATE CONSISTENCY — BettingPanel', () => {
 
     it('after clear, Deal button is disabled again', () => {
       renderPanel({ bankroll: 1000 })
-      const twenty5 = screen.getAllByRole('button').find(chip.$25)
+      const twenty5 = getChipButtons().find(chip.$25)
       fireEvent.click(twenty5)
       fireEvent.click(screen.getByRole('button', { name: /clear/i }))
       expect(screen.getByRole('button', { name: /deal/i })).toBeDisabled()
@@ -181,7 +183,7 @@ describe('UI / STATE CONSISTENCY — BettingPanel', () => {
     it('betAmount resets to $0 after Deal is clicked', () => {
       const onDeal = jest.fn()
       renderPanel({ bankroll: 1000, onDeal })
-      const twenty5 = screen.getAllByRole('button').find(chip.$25)
+      const twenty5 = getChipButtons().find(chip.$25)
       fireEvent.click(twenty5)
       fireEvent.click(screen.getByRole('button', { name: /deal/i }))
       expect(screen.getByText('$0')).toBeInTheDocument()
@@ -190,7 +192,7 @@ describe('UI / STATE CONSISTENCY — BettingPanel', () => {
     it('onDeal callback called with the bet amount', () => {
       const onDeal = jest.fn()
       renderPanel({ bankroll: 1000, onDeal })
-      const twenty5 = screen.getAllByRole('button').find(chip.$25)
+      const twenty5 = getChipButtons().find(chip.$25)
       fireEvent.click(twenty5)
       fireEvent.click(screen.getByRole('button', { name: /deal/i }))
       expect(onDeal).toHaveBeenCalledWith(25)
@@ -204,7 +206,7 @@ describe('UI / STATE CONSISTENCY — BettingPanel', () => {
      */
     it('balance < 10 — all chip buttons disabled (minimum chip $10 > bankroll)', () => {
       renderPanel({ bankroll: 5 })
-      const chipButtons = screen.getAllByRole('button').filter(b => /^\$\d+$/.test(b.textContent.trim()))
+      const chipButtons = getChipButtons()
       chipButtons.forEach(btn => expect(btn).toBeDisabled())
     })
 
@@ -215,7 +217,7 @@ describe('UI / STATE CONSISTENCY — BettingPanel', () => {
 
     it('very large bet (= full balance) — Deal allowed when bet ≤ bankroll', () => {
       renderPanel({ bankroll: 500 })
-      const btn500 = screen.getAllByRole('button').find(chip.$500)
+      const btn500 = getChipButtons().find(chip.$500)
       fireEvent.click(btn500)
       // 500 <= 500 → Deal enabled
       expect(screen.getByRole('button', { name: /deal/i })).not.toBeDisabled()
