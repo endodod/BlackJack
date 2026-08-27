@@ -22,7 +22,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #08080e;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
   overflow: hidden;
 }
 
@@ -894,7 +896,7 @@
   flex-shrink: 0;
 }
 
-/* ── Featured hand (current actor, full-size, mirrors singleplayer) ──────── */
+/* ── Featured hand (current actor, full-size, mirrors freeplay) ──────── */
 
 .mp-featured-hand-slot {
   display: flex;
@@ -1237,14 +1239,19 @@
 /* ── Game header additions ────────────────────────────── */
 
 .mp-lobby-badge {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   background: rgba(245,158,11,0.1);
   border: 1px solid rgba(245,158,11,0.3);
   border-radius: 100px;
   color: rgba(245,158,11,0.75);
-  font-size: 0.8em;
+  font-size: 1.3em;
   font-weight: 700;
   letter-spacing: 0.04em;
-  padding: 0.35em 0.85em;
+  padding: 0.5em 1.2em;
+  white-space: nowrap;
 }
 
 /* ── Controls bar multiplayer elements ────────────────── */

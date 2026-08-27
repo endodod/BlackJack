@@ -227,6 +227,23 @@ export default class BlackjackParty {
     return { id: connId, name: (name || 'Player').slice(0, 20), bankroll, approvedToJoin: false, joinType };
   }
 
+  // Best-effort callback to the Next.js app to credit a multiplayer win to the
+  // player's account (silently a no-op for guest names with no matching user).
+  async reportMultiplayerWin(username) {
+    const baseUrl = this.room.env?.NEXT_APP_URL;
+    const secret = this.room.env?.PARTY_SHARED_SECRET;
+    if (!baseUrl || !secret) return;
+    try {
+      await fetch(`${baseUrl}/api/game/multiplayer-win`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-party-secret': secret },
+        body: JSON.stringify({ username }),
+      });
+    } catch {
+      // A failed leaderboard update shouldn't affect gameplay.
+    }
+  }
+
   publicState() {
     return {
       code: this.room.id,
@@ -719,6 +736,13 @@ export default class BlackjackParty {
         player.result = isNaturalBJ ? 'Blackjack!' : result;
         player.resultAmount = isNaturalBJ ? Math.floor(player.bet * 1.5) : player.bet;
       }
+    }
+
+    for (const player of this.players) {
+      if (player.isBot) continue;
+      const won = player.result === 'Player Wins' || player.result === 'Blackjack!' ||
+        player.splitResult === 'Player Wins' || player.splitResult === 'Blackjack!';
+      if (won) this.reportMultiplayerWin(player.name);
     }
 
     this.status = 'round-end';

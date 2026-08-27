@@ -40,10 +40,10 @@ export default function ProfilePage() {
     )
   }
 
-  const { username, bankroll, hands, wins, pushes, resets, totalIncome, blackjacks, trainingHands, trainingCorrect } = stats
+  const { username, bankroll, hands, wins, pushes, resets, blackjacks, trainingHands, trainingCorrect, cardCountingHands, cardCountingCorrect } = stats
   const winRate = hands > 0 ? Math.round((wins / hands) * 100) : 0
   const trainingAccuracy = trainingHands > 0 ? Math.round((trainingCorrect / trainingHands) * 100) : null
-  const incomeDisplay = (totalIncome >= 0 ? '+' : '') + '$' + totalIncome
+  const cardCountingAccuracy = cardCountingHands > 0 ? Math.round((cardCountingCorrect / cardCountingHands) * 100) : null
 
   async function call(key, path, body) {
     setLoading(l => ({ ...l, [key]: true }))
@@ -109,14 +109,18 @@ export default function ProfilePage() {
           <Link href="/" className="profile-back-btn">← Back to Game</Link>
         </div>
 
-        {/* Stats */}
+        {/* Freeplay Stats */}
         <section className="profile-section">
-          <h2 className="profile-section-title">Singleplayer Statistics</h2>
-          <p className="profile-section-note">Hands, win rate, total income, blackjacks and pushes are for your current bankroll since the last reset.</p>
+          <h2 className="profile-section-title">Freeplay</h2>
+          <p className="profile-section-note">Hands, win rate, blackjacks and pushes are for your current bankroll since the last reset.</p>
           <div className="profile-stats-grid">
             <div className="profile-stat">
               <span className="profile-stat-label">Bankroll</span>
               <span className="profile-stat-value">${bankroll}</span>
+            </div>
+            <div className="profile-stat">
+              <span className="profile-stat-label">Bankroll Resets</span>
+              <span className="profile-stat-value">{resets ?? 0}</span>
             </div>
             <div className="profile-stat">
               <span className="profile-stat-label">Hands</span>
@@ -127,32 +131,12 @@ export default function ProfilePage() {
               <span className="profile-stat-value">{winRate}%</span>
             </div>
             <div className="profile-stat">
-              <span className="profile-stat-label">Total Income</span>
-              <span className={`profile-stat-value${totalIncome > 0 ? ' profile-stat-positive' : totalIncome < 0 ? ' profile-stat-negative' : ''}`}>
-                {incomeDisplay}
-              </span>
-            </div>
-            <div className="profile-stat">
               <span className="profile-stat-label">Blackjacks</span>
               <span className="profile-stat-value">{blackjacks ?? 0}</span>
             </div>
             <div className="profile-stat">
               <span className="profile-stat-label">Pushes</span>
               <span className="profile-stat-value">{pushes}</span>
-            </div>
-            <div className="profile-stat">
-              <span className="profile-stat-label">Training Hands</span>
-              <span className="profile-stat-value">{trainingHands ?? 0}</span>
-            </div>
-            <div className="profile-stat">
-              <span className="profile-stat-label">Training Accuracy</span>
-              <span className="profile-stat-value">
-                {trainingAccuracy !== null ? `${trainingAccuracy}%` : '—'}
-              </span>
-            </div>
-            <div className="profile-stat">
-              <span className="profile-stat-label">Bankroll Resets</span>
-              <span className="profile-stat-value">{resets ?? 0}</span>
             </div>
           </div>
           <button
@@ -164,6 +148,30 @@ export default function ProfilePage() {
           </button>
           {msg.reset?.success && <p className="profile-msg-ok">Game reset — redirecting…</p>}
           {msg.reset?.error && <p className="profile-msg-err">{msg.reset.error}</p>}
+        </section>
+
+        {/* Training Stats */}
+        <section className="profile-section">
+          <h2 className="profile-section-title">Training</h2>
+          <p className="profile-section-note">Strategy and card counting accuracy persist across bankroll resets.</p>
+          <div className="profile-stats-grid">
+            <div className="profile-stat">
+              <span className="profile-stat-label">Training Hands</span>
+              <span className="profile-stat-value">{trainingHands ?? 0}</span>
+            </div>
+            <div className="profile-stat">
+              <span className="profile-stat-label">Training Accuracy</span>
+              <span className="profile-stat-value">
+                {trainingAccuracy !== null ? `${trainingAccuracy}%` : '—'}
+              </span>
+            </div>
+            <div className="profile-stat">
+              <span className="profile-stat-label">Card Counting Accuracy</span>
+              <span className="profile-stat-value">
+                {cardCountingAccuracy !== null ? `${cardCountingAccuracy}%` : '—'}
+              </span>
+            </div>
+          </div>
         </section>
 
         {/* Change Username */}

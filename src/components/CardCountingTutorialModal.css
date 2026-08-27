@@ -1,0 +1,87 @@
+.cc-tut-modal {
+  max-width: 480px;
+}
+
+.cc-tut-values {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+}
+
+.cc-tut-value-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1em;
+  border-radius: 8px;
+  padding: 0.5em 0.8em;
+  font-size: 0.9em;
+  font-weight: 700;
+}
+
+.cc-tut-value-cards {
+  letter-spacing: 0.03em;
+}
+
+.cc-tut-value-badge {
+  min-width: 2.2em;
+  text-align: center;
+  border-radius: 6px;
+  padding: 0.15em 0.5em;
+  font-size: 0.95em;
+}
+
+.cc-tut-value-low {
+  background: rgba(34, 197, 94, 0.1);
+}
+.cc-tut-value-low .cc-tut-value-cards { color: #4ade80; }
+.cc-tut-value-low .cc-tut-value-badge { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
+
+.cc-tut-value-neutral {
+  background: rgba(156, 163, 175, 0.08);
+}
+.cc-tut-value-neutral .cc-tut-value-cards { color: #9ca3af; }
+.cc-tut-value-neutral .cc-tut-value-badge { background: rgba(156, 163, 175, 0.18); color: #9ca3af; }
+
+.cc-tut-value-high {
+  background: rgba(239, 68, 68, 0.1);
+}
+.cc-tut-value-high .cc-tut-value-cards { color: #f87171; }
+.cc-tut-value-high .cc-tut-value-badge { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+
+.cc-tut-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4em;
+}
+
+.cc-tut-section h3 {
+  margin: 0;
+  font-size: 0.75em;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #f59e0b;
+}
+
+.cc-tut-section p {
+  margin: 0;
+  font-size: 0.88em;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.cc-tut-section p strong {
+  color: #f3f4f6;
+}
+
+.cc-tut-formula {
+  align-self: flex-start;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 8px;
+  padding: 0.5em 0.9em;
+  font-size: 0.85em;
+  font-weight: 700;
+  color: #f59e0b;
+}

@@ -31,7 +31,7 @@ function generateLobbyCode() {
  *   'waiting' → waiting room (players joining, host starts)
  *   'game'    → the actual game table
  */
-export default function MultiplayerClient({ onLeave, volumeOn, onVolumeChange, volumeLevel = 1, onVolumeLevelChange, rebetEnabled, onRebetChange, showHotkeys = true, onShowHotkeysChange }) {
+export default function MultiplayerClient({ onLeave, volumeOn, onVolumeChange, volumeLevel = 1, onVolumeLevelChange, rebetEnabled, onRebetChange, showHotkeys = true, onShowHotkeysChange, betMode = 'fixed', onBetModeChange }) {
   const { data: session, status: authStatus } = useSession();
   const playerName = useMemo(() => {
     if (authStatus === 'authenticated' && session?.user?.username) return session.user.username;
@@ -253,6 +253,8 @@ export default function MultiplayerClient({ onLeave, volumeOn, onVolumeChange, v
       onRebetChange={onRebetChange}
       showHotkeys={showHotkeys}
       onShowHotkeysChange={onShowHotkeysChange}
+      betMode={betMode}
+      onBetModeChange={onBetModeChange}
       onApproveJoin={handleApproveJoin}
       onRemoveSpectator={handleRemoveSpectator}
       onResetLobby={handleResetLobby}

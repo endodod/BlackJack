@@ -85,6 +85,8 @@ export default function MultiplayerLobby({ playerName, onCreate, onJoin, onBack,
 
         {error && <div className="mp-error-msg">{error}</div>}
 
+        <button className="mp-back-btn" onClick={onBack}>← Back to Freeplay</button>
+
       </div>
     </div>
   );

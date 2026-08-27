@@ -20,6 +20,9 @@ model User {
   blackjacks      Int      @default(0)
   trainingHands   Int      @default(0)
   trainingCorrect Int      @default(0)
+  cardCountingHands   Int      @default(0)
+  cardCountingCorrect Int      @default(0)
+  multiplayerWins     Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

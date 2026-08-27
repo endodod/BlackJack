@@ -4,16 +4,20 @@ import { useDeck } from '../context/DeckContext';
 import { playSound } from '../lib/sound';
 import './BettingPanel.css';
 
-const QUICK_BETS = [10, 25, 100, 500];
+const FIXED_BETS = [10, 25, 100, 500];
+const PERCENT_BETS = [5, 10, 25, 50];
 const PRESS_ANIMATION_MS = 180;
 
-export default function BettingPanel({ onDeal, defaultBet = 0, showHotkeys = true }) {
+export default function BettingPanel({ onDeal, defaultBet = 0, showHotkeys = true, betMode = 'fixed' }) {
   const { bankroll, setCurrentBet } = useDeck();
   const [betAmount, setBetAmount] = useState(() => defaultBet <= bankroll ? defaultBet : 0);
   const [isDesktop, setIsDesktop] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 930);
   const [pressedBtn, setPressedBtn] = useState(null);
   const pressTimeoutRef = useRef(null);
   const showHints = isDesktop && showHotkeys;
+  const isPercentMode = betMode === 'percentage';
+  const chipValues = isPercentMode ? PERCENT_BETS : FIXED_BETS;
+  const chipAmount = (value) => isPercentMode ? Math.floor(bankroll * value / 100) : value;
 
   useEffect(() => {
     const check = () => setIsDesktop(window.innerWidth >= 930);
@@ -29,8 +33,9 @@ export default function BettingPanel({ onDeal, defaultBet = 0, showHotkeys = tru
     pressTimeoutRef.current = setTimeout(() => setPressedBtn(null), PRESS_ANIMATION_MS);
   };
 
-  const handleQuickBet = (amount) => {
-    if (betAmount + amount > bankroll) return false;
+  const handleQuickBet = (value) => {
+    const amount = chipAmount(value);
+    if (amount <= 0 || betAmount + amount > bankroll) return false;
     setBetAmount(prev => prev + amount);
     playSound('chip');
     return true;
@@ -56,28 +61,32 @@ export default function BettingPanel({ onDeal, defaultBet = 0, showHotkeys = tru
       if (e.code === 'Space') { e.preventDefault(); if (handleDeal()) flashPress('deal'); }
       if (!isDesktop || e.ctrlKey || e.altKey || e.metaKey) return;
       const chipIndex = ['1', '2', '3', '4'].indexOf(e.key);
-      if (chipIndex !== -1) { if (handleQuickBet(QUICK_BETS[chipIndex])) flashPress(`chip-${chipIndex}`); return; }
+      if (chipIndex !== -1) { if (handleQuickBet(chipValues[chipIndex])) flashPress(`chip-${chipIndex}`); return; }
       if (e.key === 'c' || e.key === 'C') { if (handleClear()) flashPress('clear'); }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [betAmount, bankroll, isDesktop]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [betAmount, bankroll, isDesktop, betMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="betting-panel">
       <div className="betting-row">
         <div className="chip-row">
-          {QUICK_BETS.map((amount, i) => (
-            <button
-              key={amount}
-              className={`chip-button${pressedBtn === `chip-${i}` ? ' key-pressed' : ''}`}
-              onClick={() => handleQuickBet(amount)}
-              disabled={betAmount + amount > bankroll}
-            >
-              <span className="chip-amount">${amount}</span>
-              {showHints && <span className="hotkey-hint">{i + 1}</span>}
-            </button>
-          ))}
+          {chipValues.map((value, i) => {
+            const amount = chipAmount(value);
+            const disabled = amount <= 0 || betAmount + amount > bankroll;
+            return (
+              <button
+                key={value}
+                className={`chip-button${pressedBtn === `chip-${i}` ? ' key-pressed' : ''}`}
+                onClick={() => handleQuickBet(value)}
+                disabled={disabled}
+              >
+                <span className="chip-amount">${amount}</span>
+                {showHints && <span className="hotkey-hint">{i + 1}</span>}
+              </button>
+            );
+          })}
         </div>
 
         <div className="bet-display">

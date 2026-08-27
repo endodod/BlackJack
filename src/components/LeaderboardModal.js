@@ -3,9 +3,9 @@ import { useEffect, useState } from 'react'
 import './LeaderboardModal.css'
 
 const BOARDS = [
-  { key: 'income',   label: 'Income' },
-  { key: 'training', label: 'Training' },
-  { key: 'resets',   label: 'Resets' },
+  { key: 'freeplay',    label: 'Freeplay' },
+  { key: 'training',    label: 'Training' },
+  { key: 'multiplayer', label: 'Multiplayer' },
 ]
 
 function rankClass(i) {
@@ -15,15 +15,12 @@ function rankClass(i) {
   return 'lb-rank'
 }
 
-function IncomeRow({ entry, i }) {
-  const sign = entry.totalIncome >= 0 ? '+' : ''
+function BankrollRow({ entry, i }) {
   return (
     <div className="lb-row">
       <span className={rankClass(i)}>{i + 1}</span>
       <span className="lb-name">{entry.username}</span>
-      <span className="lb-primary" data-positive={entry.totalIncome >= 0}>
-        {sign}${entry.totalIncome}
-      </span>
+      <span className="lb-primary">${entry.bankroll}</span>
       <span className="lb-secondary">{entry.hands} hands</span>
     </div>
   )
@@ -37,8 +34,22 @@ function TrainingRow({ entry, i }) {
     <div className="lb-row">
       <span className={rankClass(i)}>{i + 1}</span>
       <span className="lb-name">{entry.username}</span>
-      <span className="lb-primary">{entry.trainingHands} hands</span>
-      <span className="lb-secondary">{accuracy}% correct</span>
+      <span className="lb-primary">{accuracy}% correct</span>
+      <span className="lb-secondary">{entry.trainingHands} hands</span>
+    </div>
+  )
+}
+
+function CardCountingRow({ entry, i }) {
+  const accuracy = entry.cardCountingHands > 0
+    ? Math.round((entry.cardCountingCorrect / entry.cardCountingHands) * 100)
+    : 0
+  return (
+    <div className="lb-row">
+      <span className={rankClass(i)}>{i + 1}</span>
+      <span className="lb-name">{entry.username}</span>
+      <span className="lb-primary">{accuracy}% correct</span>
+      <span className="lb-secondary">{entry.cardCountingHands} checks</span>
     </div>
   )
 }
@@ -53,8 +64,30 @@ function ResetsRow({ entry, i }) {
   )
 }
 
+function MultiplayerRow({ entry, i }) {
+  return (
+    <div className="lb-row">
+      <span className={rankClass(i)}>{i + 1}</span>
+      <span className="lb-name">{entry.username}</span>
+      <span className="lb-primary">{entry.multiplayerWins} wins</span>
+    </div>
+  )
+}
+
+const FREEPLAY_METRICS = [
+  ['bankroll', 'Bankroll'],
+  ['resets',   'Resets'],
+]
+
+const TRAINING_METRICS = [
+  ['accuracy',     'Basic Strategy'],
+  ['cardCounting', 'Card Counting'],
+]
+
 export default function LeaderboardModal({ onClose }) {
-  const [active, setActive] = useState('income')
+  const [active, setActive] = useState('freeplay')
+  const [freeplayMetric, setFreeplayMetric] = useState('bankroll')
+  const [trainingMetric, setTrainingMetric] = useState('accuracy')
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -71,7 +104,11 @@ export default function LeaderboardModal({ onClose }) {
     return () => window.removeEventListener('keydown', handler)
   }, [onClose])
 
-  const rows = data?.[active] ?? []
+  const dataKey =
+    active === 'freeplay' ? freeplayMetric :
+    active === 'training' ? (trainingMetric === 'accuracy' ? 'training' : 'cardCounting') :
+    'multiplayerWins'
+  const rows = data?.[dataKey] ?? []
 
   return (
     <div className="lb-overlay" onClick={onClose}>
@@ -93,12 +130,44 @@ export default function LeaderboardModal({ onClose }) {
           ))}
         </div>
 
+        {active === 'freeplay' && (
+          <div className="lb-subtabs">
+            {FREEPLAY_METRICS.map(([key, label]) => (
+              <button
+                key={key}
+                className={`lb-subtab${freeplayMetric === key ? ' lb-subtab-active' : ''}`}
+                onClick={() => setFreeplayMetric(key)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {active === 'training' && (
+          <div className="lb-subtabs">
+            {TRAINING_METRICS.map(([key, label]) => (
+              <button
+                key={key}
+                className={`lb-subtab${trainingMetric === key ? ' lb-subtab-active' : ''}`}
+                onClick={() => setTrainingMetric(key)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
         <p className="lb-filter-note">
-          {active === 'income'
-            ? 'Minimum 5 hands played to qualify'
+          {active === 'freeplay'
+            ? freeplayMetric === 'bankroll'
+              ? 'Minimum 5 hands played to qualify'
+              : 'Amount of bankroll resets in freeplay'
             : active === 'training'
-            ? 'Minimum 5 training hands to qualify'
-            : 'Amount of bankroll resets in freeplay'}
+            ? trainingMetric === 'accuracy'
+              ? 'Minimum 5 training hands to qualify'
+              : 'Minimum 5 card counting checks to qualify'
+            : 'Multiplayer rounds won'}
         </p>
 
         <div className="lb-list">
@@ -107,9 +176,15 @@ export default function LeaderboardModal({ onClose }) {
             <div className="lb-empty">No entries yet.</div>
           )}
           {!loading && rows.map((entry, i) => (
-            active === 'income'   ? <IncomeRow   key={entry.username} entry={entry} i={i} /> :
-            active === 'training' ? <TrainingRow key={entry.username} entry={entry} i={i} /> :
-                                    <ResetsRow   key={entry.username} entry={entry} i={i} />
+            active === 'freeplay'
+              ? (freeplayMetric === 'bankroll'
+                  ? <BankrollRow key={entry.username} entry={entry} i={i} />
+                  : <ResetsRow   key={entry.username} entry={entry} i={i} />)
+              : active === 'training'
+              ? (trainingMetric === 'accuracy'
+                  ? <TrainingRow      key={entry.username} entry={entry} i={i} />
+                  : <CardCountingRow  key={entry.username} entry={entry} i={i} />)
+              : <MultiplayerRow key={entry.username} entry={entry} i={i} />
           ))}
         </div>
       </div>

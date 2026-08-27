@@ -8,13 +8,14 @@ import MultiplayerClient from './multiplayer/MultiplayerClient'
 
 export default function GameClient({ initialStats }) {
   const { data: session, status } = useSession()
-  const [mode, setMode] = useState('singleplayer') // 'singleplayer' | 'multiplayer'
+  const [mode, setMode] = useState('freeplay') // 'freeplay' | 'multiplayer'
   const [guestMode, setGuestMode] = useState(false)
   const [modalDismissed, setModalDismissed] = useState(false)
   const [volumeOn, setVolumeOn] = useState(true)
   const [volumeLevel, setVolLevel] = useState(1)
   const [rebetEnabled, setRebetEnabled] = useState(true)
   const [showHotkeys, setShowHotkeys] = useState(true)
+  const [betMode, setBetMode] = useState('fixed')
   const [userId, setUserId] = useState(session?.user?.id ?? null)
   const [dbStats, setDbStats] = useState(initialStats !== undefined ? initialStats : undefined)
   const saveTimer = useRef(null)
@@ -39,6 +40,10 @@ export default function GameClient({ initialStats }) {
       const storedShowHotkeys = localStorage.getItem('showHotkeys')
       if (storedShowHotkeys !== null) {
         setShowHotkeys(storedShowHotkeys === 'true')
+      }
+      const storedBetMode = localStorage.getItem('betMode')
+      if (storedBetMode === 'fixed' || storedBetMode === 'percentage') {
+        setBetMode(storedBetMode)
       }
     }
   }, [])
@@ -71,9 +76,9 @@ export default function GameClient({ initialStats }) {
     prevUserIdRef.current = session?.user?.id
   }, [session])
 
-  const handleRoundEnd = useCallback(({ bankroll, stats, trainingStats }) => {
+  const handleRoundEnd = useCallback(({ bankroll, stats, trainingStats, cardCountingStats }) => {
     if (!session?.user?.id) return
-    pendingSave.current = { bankroll, ...stats, ...trainingStats }
+    pendingSave.current = { bankroll, ...stats, ...trainingStats, ...cardCountingStats }
     clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(async () => {
       const data = pendingSave.current
@@ -129,6 +134,13 @@ export default function GameClient({ initialStats }) {
     }
   }, [])
 
+  const handleBetModeChange = useCallback((val) => {
+    setBetMode(val)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('betMode', val)
+    }
+  }, [])
+
   // Fallback while session or stats are still resolving (should be near-instant with server prefetch)
   if (status === 'loading' || (status === 'authenticated' && dbStats === undefined)) {
     return <div style={{ background: '#08080e', minHeight: '100vh' }} />
@@ -137,8 +149,8 @@ export default function GameClient({ initialStats }) {
   const showModal = status === 'unauthenticated' && !guestMode && !modalDismissed
   const initialBankroll = dbStats?.bankroll ?? 1000
   const gameStats = dbStats
-    ? { hands: dbStats.hands, wins: dbStats.wins, losses: dbStats.losses, pushes: dbStats.pushes, totalIncome: dbStats.totalIncome ?? 0, blackjacks: dbStats.blackjacks ?? 0, trainingHands: dbStats.trainingHands ?? 0, trainingCorrect: dbStats.trainingCorrect ?? 0 }
-    : { hands: 0, wins: 0, losses: 0, pushes: 0, totalIncome: 0, blackjacks: 0, trainingHands: 0, trainingCorrect: 0 }
+    ? { hands: dbStats.hands, wins: dbStats.wins, losses: dbStats.losses, pushes: dbStats.pushes, totalIncome: dbStats.totalIncome ?? 0, blackjacks: dbStats.blackjacks ?? 0, trainingHands: dbStats.trainingHands ?? 0, trainingCorrect: dbStats.trainingCorrect ?? 0, cardCountingHands: dbStats.cardCountingHands ?? 0, cardCountingCorrect: dbStats.cardCountingCorrect ?? 0 }
+    : { hands: 0, wins: 0, losses: 0, pushes: 0, totalIncome: 0, blackjacks: 0, trainingHands: 0, trainingCorrect: 0, cardCountingHands: 0, cardCountingCorrect: 0 }
 
   const isMultiplayer = mode === 'multiplayer'
 
@@ -162,14 +174,16 @@ export default function GameClient({ initialStats }) {
             onRebetChange={handleRebetChange}
             showHotkeys={showHotkeys}
             onShowHotkeysChange={handleShowHotkeysChange}
+            betMode={betMode}
+            onBetModeChange={handleBetModeChange}
             onSwitchToMultiplayer={() => setMode('multiplayer')}
           />
         </DeckProvider>
       </div>
       {isMultiplayer && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 100 }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 250 }}>
           <MultiplayerClient
-            onLeave={() => setMode('singleplayer')}
+            onLeave={() => setMode('freeplay')}
             volumeOn={volumeOn}
             onVolumeChange={handleVolumeChange}
             volumeLevel={volumeLevel}
@@ -178,6 +192,8 @@ export default function GameClient({ initialStats }) {
             onRebetChange={handleRebetChange}
             showHotkeys={showHotkeys}
             onShowHotkeysChange={handleShowHotkeysChange}
+            betMode={betMode}
+            onBetModeChange={handleBetModeChange}
           />
         </div>
       )}

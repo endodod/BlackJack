@@ -8,16 +8,19 @@ import DealerHand from './components/DealerHand';
 import PlayerActions from "./components/PlayerActions";
 import BettingPanel from "./components/BettingPanel";
 import TrainingFeedback from "./components/TrainingFeedback";
+import CardCountingQuiz from "./components/CardCountingQuiz";
+import CardCountingFeedback from "./components/CardCountingFeedback";
 import ResultPanel from "./components/ResultPanel";
 import StatusBanner from "./components/StatusBanner";
 import StrategyTableModal from "./components/StrategyTableModal";
+import CardCountingTutorialModal from "./components/CardCountingTutorialModal";
 import LeaderboardModal from "./components/LeaderboardModal";
 import TestDealPanel from "./components/TestDealPanel";
 import Link from 'next/link';
 
 // gamePhase values: 'betting' | 'dealing' | 'player' | 'dealer' | 'pausing' | 'result'
 
-function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIncome: 0, blackjacks: 0, trainingHands: 0, trainingCorrect: 0 }, onRoundEnd, onReset, onShowAuth, volumeOn, onVolumeChange, volumeLevel = 1, onVolumeLevelChange, rebetEnabled = true, onRebetChange, showHotkeys = true, onShowHotkeysChange, onSwitchToMultiplayer }) {
+function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIncome: 0, blackjacks: 0, trainingHands: 0, trainingCorrect: 0 }, onRoundEnd, onReset, onShowAuth, volumeOn, onVolumeChange, volumeLevel = 1, onVolumeLevelChange, rebetEnabled = true, onRebetChange, showHotkeys = true, onShowHotkeysChange, betMode = 'fixed', onBetModeChange, onSwitchToMultiplayer }) {
   const { data: session } = useSession();
 
   // ── UI-only state ────────────────────────────────────────────────────────────
@@ -27,11 +30,16 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
   const [practiceHardHands, setPracticeHardHands] = useState(true);
   const [practiceSoftHands, setPracticeSoftHands] = useState(true);
   const [practicePairs, setPracticePairs]         = useState(true);
+  const [cardCountingEnabled, setCardCountingEnabled]   = useState(false);
+  const [cardCountingInterval, setCardCountingInterval] = useState(5);
+  const [cardCountingMetric, setCardCountingMetric]     = useState('true');
   const [showStrategyTable, setShowStrategyTable] = useState(false);
+  const [showCardCountingTutorial, setShowCardCountingTutorial] = useState(false);
   const [showLeaderboard, setShowLeaderboard]     = useState(false);
   const [testHand, setTestHand]             = useState(null);
   const [testDealerHand, setTestDealerHand] = useState(null);
   const earlyResign = true;
+  const fullHandMode = trainingMode === 'basic' && cardCountingEnabled;
   const menuRef = useRef(null);
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 930);
 
@@ -63,8 +71,10 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
     isSplitActive, isOutOfMoney, hasSplitPair, canSplit, canDouble, canResign,
     splitHand2, splitHand1Completed, splitBet, splitHand1Bet, pressedAction,
     playerHand, dealerHand, bankroll, currentBet,
+    cardCountingStats, cardCountingQuiz, cardCountingFeedback,
     dealCards, cancelHand, handleDouble, handleStand, handleSplit, handleResign,
     handleReset, handleResultsClose, handleActionValidation,
+    submitCardCountingAnswer, handleCardCountingResultClose,
   } = useBlackjackGame({
     initialStats,
     onRoundEnd,
@@ -75,10 +85,18 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
     practiceHardHands,
     practiceSoftHands,
     practicePairs,
+    cardCountingEnabled,
+    cardCountingInterval,
+    cardCountingMetric,
     testHand,
     testDealerHand,
     earlyResign,
   });
+
+  const handleBackToFreeplay = () => {
+    if (gamePhase !== 'betting') cancelHand();
+    setTrainingMode('off');
+  };
 
   return (
     <div className="game-table">
@@ -88,7 +106,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
           <Link href="/" className="game-title">Blackjack</Link>
           <nav className="game-nav">
             {[
-              ['off',   'Singleplayer'],
+              ['off',   'Freeplay'],
               ['basic', 'Training'],
             ].map(([val, label]) => (
               <button
@@ -170,7 +188,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
                 <div className="menu-mobile-section">
                   <span className="menu-section-label">Mode</span>
                   {[
-                    ['off',   'Singleplayer'],
+                    ['off',   'Freeplay'],
                     ['basic', 'Training'],
                   ].map(([val, label]) => (
                     <button
@@ -250,6 +268,15 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
                     {showHotkeys ? 'ON' : 'OFF'}
                   </button>
                 </div>
+                <div className="menu-row">
+                  <span className="menu-label">Bet Mode</span>
+                  <button
+                    className="menu-toggle"
+                    onClick={() => onBetModeChange?.(betMode === 'percentage' ? 'fixed' : 'percentage')}
+                  >
+                    {betMode === 'percentage' ? '%' : 'Fixed'}
+                  </button>
+                </div>
                 {session?.user?.username && (
                   <Link
                     href="/profile"
@@ -301,10 +328,21 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
                 >
                   Strategy Table
                 </button>
+                {cardCountingEnabled && (
+                  <button
+                    className="training-hand-btn strategy-table-btn"
+                    onClick={() => setShowCardCountingTutorial(true)}
+                  >
+                    CC Tutorial
+                  </button>
+                )}
               </div>
               <div className="training-mobile-bar-stats">
                 <span>Hands <strong>{strategyStats.total}</strong></span>
                 <span>Accuracy <strong>{strategyStats.total > 0 ? `${Math.round(strategyStats.correct / strategyStats.total * 100)}%` : '—'}</strong></span>
+                {cardCountingEnabled && (
+                  <span>CC <strong>{cardCountingStats.total > 0 ? `${Math.round(cardCountingStats.correct / cardCountingStats.total * 100)}%` : '—'}</strong></span>
+                )}
               </div>
             </div>
           )}
@@ -320,10 +358,12 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
           {/* Training setup / controls */}
           {trainingMode === 'basic' && (
             trainingSetup ? (
-              <div className="training-setup-overlay">
-                <div className="training-setup-card">
-                  <h2 className="training-setup-title">Training Setup</h2>
-                  <p className="training-setup-subtitle">Select which hand types to practice</p>
+              <div className="training-setup-overlay" onClick={handleBackToFreeplay}>
+                <div className="training-setup-card" onClick={e => e.stopPropagation()}>
+                  <div className="training-setup-header">
+                    <h2 className="training-setup-title">Training Setup</h2>
+                    <p className="training-setup-subtitle">Select which hand types to practice</p>
+                  </div>
                   <div className="training-setup-checks">
                     {[
                       ['Hard Hands', practiceHardHands, setPracticeHardHands],
@@ -335,6 +375,46 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
                         <span>{label}</span>
                       </label>
                     ))}
+                    <label className="training-setup-check">
+                      <input
+                        type="checkbox"
+                        checked={cardCountingEnabled}
+                        onChange={e => setCardCountingEnabled(e.target.checked)}
+                      />
+                      <span>Card Counting</span>
+                    </label>
+                  </div>
+                  <div className={`training-setup-cc-config${cardCountingEnabled ? '' : ' training-setup-cc-config-disabled'}`}>
+                    <label className="training-setup-cc-row">
+                      <span>Ask every</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={50}
+                        disabled={!cardCountingEnabled}
+                        className="training-setup-cc-interval"
+                        value={cardCountingInterval}
+                        onChange={e => setCardCountingInterval(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                      />
+                      <span>rounds</span>
+                    </label>
+                    <div className="training-setup-cc-metric">
+                      {[
+                        ['true',    'True Count'],
+                        ['running', 'Running Count'],
+                        ['both',    'Both'],
+                      ].map(([val, label]) => (
+                        <button
+                          type="button"
+                          key={val}
+                          disabled={!cardCountingEnabled}
+                          className={`training-setup-cc-metric-btn${cardCountingMetric === val ? ' training-setup-cc-metric-btn-on' : ''}`}
+                          onClick={() => setCardCountingMetric(val)}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   <button
                     className="training-setup-start-btn"
@@ -342,6 +422,9 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
                     onClick={() => setTrainingSetup(false)}
                   >
                     Start Training
+                  </button>
+                  <button className="training-setup-back-btn" onClick={handleBackToFreeplay}>
+                    ← Back to Freeplay
                   </button>
                 </div>
               </div>
@@ -360,6 +443,14 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
                   >
                     Strategy Table
                   </button>
+                  {cardCountingEnabled && (
+                    <button
+                      className="training-hand-btn strategy-table-btn"
+                      onClick={() => setShowCardCountingTutorial(true)}
+                    >
+                      Card Counting Tutorial
+                    </button>
+                  )}
                 </div>
                 <div className="training-session-stats">
                   <div className="training-session-stat-row">
@@ -376,12 +467,32 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
                     })()}
                   </div>
                 </div>
+                {cardCountingEnabled && (
+                  <div className="training-session-stats">
+                    <div className="training-session-stat-row">
+                      <span>Card Counting</span>
+                    </div>
+                    <div className="training-session-stat-row training-session-stat-divider" />
+                    <div className="training-session-stat-row">
+                      <span>Asked</span>
+                      <span className="training-session-stat-value">{cardCountingStats.total}</span>
+                    </div>
+                    <div className="training-session-stat-row">
+                      <span>Accuracy</span>
+                      {(() => {
+                        const pct = cardCountingStats.total > 0 ? Math.round(cardCountingStats.correct / cardCountingStats.total * 100) : null;
+                        const cls = pct === null ? 'training-session-stat-value' : pct >= 70 ? 'training-session-stat-value stat-win' : pct < 50 ? 'training-session-stat-value stat-loss' : 'training-session-stat-value';
+                        return <span className={cls}>{pct !== null ? `${pct}%` : '—'}</span>;
+                      })()}
+                    </div>
+                  </div>
+                )}
               </div>
             )
           )}
 
           <DealerHand hand={dealerHand} gamePhase={gamePhase} />
-          {statusMessage && <StatusBanner message={statusMessage} />}
+          {statusMessage && trainingMode !== 'basic' && <StatusBanner message={statusMessage} />}
 
           {isSplitActive ? (
             <div className="split-hands-row player-section">
@@ -413,7 +524,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
                   onDealerSelect={setTestDealerHand}
                 />
               )}
-              <BettingPanel onDeal={dealCards} defaultBet={rebetEnabled ? lastBetAmount : 0} showHotkeys={showHotkeys} />
+              <BettingPanel onDeal={dealCards} defaultBet={rebetEnabled ? lastBetAmount : 0} showHotkeys={showHotkeys} betMode={betMode} />
             </div>
           )}
           {gamePhase === 'player' && !statusMessage && (
@@ -423,7 +534,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
               canDouble={canDouble}
               canResign={canResign}
               onDouble={handleDouble}
-              onStand={trainingMode !== 'basic' ? handleStand : undefined}
+              onStand={(trainingMode !== 'basic' || fullHandMode) ? handleStand : undefined}
               onSplit={handleSplit}
               onResign={handleResign}
               onValidate={trainingMode === 'basic' ? handleActionValidation : undefined}
@@ -435,12 +546,20 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
           {gamePhase === 'training-result' && trainingFeedback && (
             <TrainingFeedback feedback={trainingFeedback} onSkip={cancelHand} />
           )}
-          {gamePhase === 'result' && trainingMode !== 'basic' && (
+          {gamePhase === 'card-counting-quiz' && cardCountingQuiz && (
+            <CardCountingQuiz metric={cardCountingMetric} onSubmit={submitCardCountingAnswer} />
+          )}
+          {gamePhase === 'card-counting-result' && cardCountingFeedback && (
+            <CardCountingFeedback feedback={cardCountingFeedback} onSkip={handleCardCountingResultClose} />
+          )}
+          {gamePhase === 'result' && (trainingMode !== 'basic' || fullHandMode) && (
             <ResultPanel
               result={resultMessage}
               amount={resultAmount}
               splitResults={splitResults}
               onNext={handleResultsClose}
+              hideAmount={trainingMode === 'basic'}
+              trainingFeedback={trainingMode === 'basic' ? trainingFeedback : null}
             />
           )}
           {(gamePhase === 'dealing' || gamePhase === 'dealer' || gamePhase === 'pausing' ||
@@ -455,6 +574,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
 
       {/* ── Modals ── */}
       {showStrategyTable && <StrategyTableModal onClose={() => setShowStrategyTable(false)} />}
+      {showCardCountingTutorial && <CardCountingTutorialModal onClose={() => setShowCardCountingTutorial(false)} />}
       {showLeaderboard   && <LeaderboardModal   onClose={() => setShowLeaderboard(false)}   />}
       {isOutOfMoney && trainingMode !== 'basic' && (
         <div className="broke-overlay">

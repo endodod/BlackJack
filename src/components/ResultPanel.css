@@ -26,6 +26,11 @@
   color: #fb923c;
 }
 
+.result-training-feedback {
+  font-size: 1.4em;
+  text-align: center;
+}
+
 .result-amount {
   font-size: 1.7em;
   font-weight: 800;

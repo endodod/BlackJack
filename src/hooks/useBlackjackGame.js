@@ -12,6 +12,9 @@ const RESHUFFLE_THRESHOLD = Math.floor(4 * 52 * 0.25);
 const SUITS  = ['♠', '♥', '♦', '♣'];
 const VALUES = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
 
+// Hi-Lo card counting system
+const HI_LO_VALUES = { '2':1,'3':1,'4':1,'5':1,'6':1,'7':0,'8':0,'9':0,'10':-1,'J':-1,'Q':-1,'K':-1,'A':-1 };
+
 // ── Pure helpers ──────────────────────────────────────────────────────────────
 
 function classifyHandType(c0, c2) {
@@ -64,6 +67,9 @@ export function useBlackjackGame({
   practiceHardHands,
   practiceSoftHands,
   practicePairs,
+  cardCountingEnabled = false,
+  cardCountingInterval = 5,
+  cardCountingMetric = 'true',
   testHand,
   testDealerHand,
   earlyResign = false,
@@ -92,6 +98,9 @@ export function useBlackjackGame({
   const [expectedAction, setExpectedAction] = useState(null);
   const [actionFeedback, setActionFeedback] = useState(null);
   const [trainingFeedback, setTrainingFeedback] = useState(null);
+  const [cardCountingStats, setCardCountingStats] = useState({ total: 0, correct: 0 });
+  const [cardCountingQuiz, setCardCountingQuiz]       = useState(null);
+  const [cardCountingFeedback, setCardCountingFeedback] = useState(null);
 
   // Split state
   const [splitHand2, setSplitHand2]                   = useState([]);
@@ -111,8 +120,55 @@ export function useBlackjackGame({
   const dealCardsRef       = useRef(null);
   const handIdRef          = useRef(0);
 
+  // Card counting (Hi-Lo running count, tracked from deck shrinkage — reshuffles reset it to 0)
+  const runningCountRef          = useRef(0);
+  const prevDeckRef              = useRef(deck);
+  const initialCardCountingRef   = useRef({ hands: initialStats.cardCountingHands ?? 0, correct: initialStats.cardCountingCorrect ?? 0 });
+  const cardCountingStatsRef     = useRef({ total: 0, correct: 0 });
+  const roundsSinceQuizRef       = useRef(0);
+  const cardCountingEnabledRef   = useRef(cardCountingEnabled);
+  const cardCountingIntervalRef  = useRef(cardCountingInterval);
+  const cardCountingMetricRef    = useRef(cardCountingMetric);
+  cardCountingEnabledRef.current  = cardCountingEnabled;
+  cardCountingIntervalRef.current = cardCountingInterval;
+  cardCountingMetricRef.current   = cardCountingMetric;
+
+  // Card counting requires seeing every card dealt (dealer hole card, hits, dealer's draws) —
+  // so training rounds play out fully instead of ending after the first decision.
+  const fullHandModeRef = useRef(false);
+  fullHandModeRef.current = trainingMode === 'basic' && cardCountingEnabled;
+  const actionFeedbackTimeoutRef = useRef(null);
+
   useEffect(() => { bankrollRef.current = bankroll; }, [bankroll]);
   useEffect(() => { statsRef.current = stats; }, [stats]);
+
+  // Update running count whenever the deck shrinks (cards dealt) or resets (reshuffle).
+  // Diffed by value counts rather than array position — training mode's dealCards()
+  // reorders the deck (findValidArrangement) before dealing, so the dealt cards aren't
+  // necessarily the previous deck's first N entries.
+  useEffect(() => {
+    const prevDeck = prevDeckRef.current;
+    if (deck.length > prevDeck.length) {
+      runningCountRef.current = 0;
+    } else if (deck.length < prevDeck.length) {
+      const prevCounts = {};
+      for (const c of prevDeck) prevCounts[c.value] = (prevCounts[c.value] || 0) + 1;
+      const newCounts = {};
+      for (const c of deck) newCounts[c.value] = (newCounts[c.value] || 0) + 1;
+      let delta = 0;
+      for (const value of Object.keys(prevCounts)) {
+        const dealt = prevCounts[value] - (newCounts[value] || 0);
+        if (dealt > 0) delta += dealt * (HI_LO_VALUES[value] ?? 0);
+      }
+      runningCountRef.current += delta;
+    }
+    prevDeckRef.current = deck;
+  }, [deck]);
+
+  const getTrueCount = useCallback(() => {
+    const decksRemaining = Math.max(deck.length / 52, 0.25);
+    return runningCountRef.current / decksRemaining;
+  }, [deck.length]);
 
   // Init deck on mount if empty
   useEffect(() => {
@@ -131,7 +187,29 @@ export function useBlackjackGame({
     setExpectedAction(null);
     setActionFeedback(null);
     setTrainingFeedback(null);
+    setCardCountingQuiz(null);
+    setCardCountingFeedback(null);
+    roundsSinceQuizRef.current = 0;
   }, [trainingMode]);
+
+  // `stats` state stays equal to the full `initialStats` prop (trainingHands/cardCountingHands
+  // baked in) whenever setStats is never called during a training-only session. Any onRoundEnd
+  // payload that spreads `stats` without also re-supplying fresh trainingStats/cardCountingStats
+  // would silently regress the other counter back to that stale session-start baseline — so every
+  // training-mode save always carries both, reflecting the latest ref values.
+  const getPersistedTrainingFields = () => {
+    if (trainingModeRef.current !== 'basic') return {};
+    return {
+      trainingStats: {
+        trainingHands: initialTrainingRef.current.hands + strategyStatsRef.current.total,
+        trainingCorrect: initialTrainingRef.current.correct + strategyStatsRef.current.correct,
+      },
+      cardCountingStats: {
+        cardCountingHands: initialCardCountingRef.current.hands + cardCountingStatsRef.current.total,
+        cardCountingCorrect: initialCardCountingRef.current.correct + cardCountingStatsRef.current.correct,
+      },
+    };
+  };
 
   // ── Game logic ──────────────────────────────────────────────────────────────
 
@@ -161,7 +239,7 @@ export function useBlackjackGame({
     setResultMessage(isNaturalBlackjack ? 'Blackjack!' : result);
     const incomeDelta = trainingModeRef.current !== 'basic' ? delta - (betAmount ?? currentBet) : 0;
     setStats(prev => {
-      const next = {
+      const next = trainingModeRef.current === 'basic' ? prev : {
         hands: prev.hands + 1,
         wins: prev.wins + (result === 'Player Wins' ? 1 : 0),
         losses: prev.losses + (result === 'House Wins' ? 1 : 0),
@@ -169,12 +247,7 @@ export function useBlackjackGame({
         totalIncome: prev.totalIncome + incomeDelta,
         blackjacks: prev.blackjacks + (isNaturalBlackjack ? 1 : 0),
       };
-      const s = strategyStatsRef.current;
-      const trainingStats = trainingModeRef.current === 'basic' ? {
-        trainingHands: initialTrainingRef.current.hands + s.total,
-        trainingCorrect: initialTrainingRef.current.correct + s.correct,
-      } : undefined;
-      onRoundEnd?.({ bankroll: bankrollRef.current + delta, stats: next, trainingStats });
+      onRoundEnd?.({ bankroll: bankrollRef.current + delta, stats: next, ...getPersistedTrainingFields() });
       return next;
     });
     return result;
@@ -197,6 +270,8 @@ export function useBlackjackGame({
     setTrainingFeedback(null);
     setExpectedAction(null);
     setActionFeedback(null);
+    setCardCountingQuiz(null);
+    setCardCountingFeedback(null);
     setGamePhase('betting');
   }, [setPlayerHand, setDealerHand, setPlayerTurn, setCurrentBet]);
 
@@ -313,22 +388,32 @@ export function useBlackjackGame({
     onRoundEnd?.({
       bankroll: bankrollRef.current,
       stats: statsRef.current,
-      trainingStats: {
-        trainingHands: initialTrainingRef.current.hands + next.total,
-        trainingCorrect: initialTrainingRef.current.correct + next.correct,
-      },
+      ...getPersistedTrainingFields(),
     });
+    // Recorded regardless of mode — full-hand mode shows this on the eventual result
+    // panel instead of the win/lose outcome, since training rounds aren't about winning.
     setTrainingFeedback({ correct: isCorrect, expected: expectedAction });
-    setGamePhase('training-result');
+    if (fullHandModeRef.current) {
+      // Only the first decision per hand is scored against basic strategy — clear it so
+      // later hits/etc. in the same hand (which now plays out fully) aren't re-validated.
+      setExpectedAction(null);
+      setActionFeedback(isCorrect ? 'correct' : 'incorrect');
+      clearTimeout(actionFeedbackTimeoutRef.current);
+      actionFeedbackTimeoutRef.current = setTimeout(() => setActionFeedback(null), 600);
+    } else {
+      setGamePhase('training-result');
+    }
   }, [expectedAction, onRoundEnd]);
 
   const handleDouble = useCallback(() => {
     if (playerHand.length !== 2 || (trainingModeRef.current !== 'basic' && currentBet > bankroll) || deck.length === 0) return false;
     handleActionValidation('double');
-    if (trainingModeRef.current === 'basic') return true;
+    if (trainingModeRef.current === 'basic' && !fullHandModeRef.current) return true;
     playSound('chip');
-    setBankroll(prev => prev - currentBet);
-    setCurrentBet(prev => prev * 2);
+    if (trainingModeRef.current !== 'basic') {
+      setBankroll(prev => prev - currentBet);
+      setCurrentBet(prev => prev * 2);
+    }
     const { updatedHand, updatedDeck } = drawCard({ hand: playerHand, deck });
     setTimeout(() => {
       playSound('draw');
@@ -341,7 +426,7 @@ export function useBlackjackGame({
 
   const handleStand = useCallback(() => {
     handleActionValidation('stand');
-    if (trainingModeRef.current === 'basic') return;
+    if (trainingModeRef.current === 'basic' && !fullHandModeRef.current) return;
     playSound('stand');
     setTimeout(() => setPlayerTurn(false), 500);
   }, [setPlayerTurn, handleActionValidation]);
@@ -356,11 +441,11 @@ export function useBlackjackGame({
       (trainingModeRef.current !== 'basic' && currentBet > bankroll)
     ) return false;
     handleActionValidation('split');
-    if (trainingModeRef.current === 'basic') return true;
+    if (trainingModeRef.current === 'basic' && !fullHandModeRef.current) return true;
     const [card1, card2] = playerHand;
     const newCard1 = deck[0];
     const newCard2 = deck[1];
-    setBankroll(prev => prev - currentBet);
+    if (trainingModeRef.current !== 'basic') setBankroll(prev => prev - currentBet);
     setSplitBet(currentBet);
     setDeck(prev => prev.slice(2));
     setPlayerHand([card1]);
@@ -374,8 +459,9 @@ export function useBlackjackGame({
   const handleResign = useCallback(() => {
     if (playerHand.length !== 2 || splitHand2.length > 0 || splitHand1Completed.length > 0) return false;
     handleActionValidation('resign');
-    if (trainingModeRef.current === 'basic') return true;
+    if (trainingModeRef.current === 'basic' && !fullHandModeRef.current) return true;
 
+    const isTraining = trainingModeRef.current === 'basic';
     const handId = handIdRef.current;
     const dealerTotal = getHandTotal(dealerHand);
     const dealerHasBJ = dealerHand.length === 2 && dealerTotal === 21;
@@ -396,7 +482,7 @@ export function useBlackjackGame({
     } else {
       gameTransitionRef.current = true;
       const halfBet = Math.floor(currentBet / 2);
-      setBankroll(prev => prev + halfBet);
+      if (!isTraining) setBankroll(prev => prev + halfBet);
       setPlayerTurn(false);
       setStatusMessage('Resigned!');
       playSound('bust');
@@ -407,9 +493,9 @@ export function useBlackjackGame({
         setWinner('House Wins');
         setResultMessage('Resigned');
         setResultAmount(lostAmount);
-        const incomeDelta = -lostAmount;
+        const incomeDelta = isTraining ? 0 : -lostAmount;
         setStats(prev => {
-          const next = {
+          const next = isTraining ? prev : {
             hands: prev.hands + 1,
             wins: prev.wins,
             losses: prev.losses + 1,
@@ -417,12 +503,7 @@ export function useBlackjackGame({
             totalIncome: prev.totalIncome + incomeDelta,
             blackjacks: prev.blackjacks,
           };
-          const s = strategyStatsRef.current;
-          const trainingStats = trainingModeRef.current === 'basic' ? {
-            trainingHands: initialTrainingRef.current.hands + s.total,
-            trainingCorrect: initialTrainingRef.current.correct + s.correct,
-          } : undefined;
-          onRoundEnd?.({ bankroll: bankrollRef.current + halfBet, stats: next, trainingStats });
+          onRoundEnd?.({ bankroll: bankrollRef.current + (isTraining ? 0 : halfBet), stats: next, ...getPersistedTrainingFields() });
           return next;
         });
         setGamePhase('result');
@@ -445,8 +526,19 @@ export function useBlackjackGame({
     setSplitBet(0);
     setSplitHand1Bet(0);
     setSplitResults(null);
+    // Rounds only reach 'result' in training via full-hand mode (short-circuit training
+    // never gets past 'training-result') — so this is the right place to pace the quiz.
+    if (trainingModeRef.current === 'basic' && cardCountingEnabledRef.current) {
+      roundsSinceQuizRef.current += 1;
+      if (roundsSinceQuizRef.current >= Math.max(cardCountingIntervalRef.current, 1)) {
+        roundsSinceQuizRef.current = 0;
+        setCardCountingQuiz({ runningCount: runningCountRef.current, trueCount: getTrueCount() });
+        setGamePhase('card-counting-quiz');
+        return;
+      }
+    }
     setGamePhase('betting');
-  }, [setPlayerHand, setDealerHand, setPlayerTurn, setCurrentBet]);
+  }, [setPlayerHand, setDealerHand, setPlayerTurn, setCurrentBet, getTrueCount]);
 
   const handleReset = useCallback(() => {
     gameTransitionRef.current = false;
@@ -467,6 +559,11 @@ export function useBlackjackGame({
     setStrategyStats({ total: 0, correct: 0 });
     setExpectedAction(null);
     setActionFeedback(null);
+    setCardCountingStats({ total: 0, correct: 0 });
+    cardCountingStatsRef.current = { total: 0, correct: 0 };
+    setCardCountingQuiz(null);
+    setCardCountingFeedback(null);
+    roundsSinceQuizRef.current = 0;
     onMenuClose?.();
     setGamePhase('betting');
     onReset?.();
@@ -614,7 +711,7 @@ export function useBlackjackGame({
             }
             const splitIncomeDelta = trainingModeRef.current !== 'basic' ? splitDelta - (bet1 + bet2) : 0;
             setStats(prev => {
-              const next = {
+              const next = trainingModeRef.current === 'basic' ? prev : {
                 hands: prev.hands + 2,
                 wins: prev.wins + (result1 === 'Player Wins' ? 1 : 0) + (result2 === 'Player Wins' ? 1 : 0),
                 losses: prev.losses + (result1 === 'House Wins' ? 1 : 0) + (result2 === 'House Wins' ? 1 : 0),
@@ -622,12 +719,7 @@ export function useBlackjackGame({
                 totalIncome: prev.totalIncome + splitIncomeDelta,
                 blackjacks: prev.blackjacks,
               };
-              const s = strategyStatsRef.current;
-              const trainingStats = trainingModeRef.current === 'basic' ? {
-                trainingHands: initialTrainingRef.current.hands + s.total,
-                trainingCorrect: initialTrainingRef.current.correct + s.correct,
-              } : undefined;
-              onRoundEnd?.({ bankroll: bankrollRef.current + splitDelta, stats: next, trainingStats });
+              onRoundEnd?.({ bankroll: bankrollRef.current + splitDelta, stats: next, ...getPersistedTrainingFields() });
               return next;
             });
             setSplitResults({ result1, result2, amount1: bet1, amount2: bet2 });
@@ -665,6 +757,7 @@ export function useBlackjackGame({
   }, []);
 
   useEffect(() => () => clearTimeout(pressedActionTimeoutRef.current), []);
+  useEffect(() => () => clearTimeout(actionFeedbackTimeoutRef.current), []);
 
   useEffect(() => {
     const handleKeyPress = (event) => {
@@ -676,7 +769,7 @@ export function useBlackjackGame({
           if (deck.length > 0) {
             flashPressedAction('hit');
             handleActionValidation('hit');
-            if (trainingModeRef.current !== 'basic') {
+            if (trainingModeRef.current !== 'basic' || fullHandModeRef.current) {
               const { updatedHand, updatedDeck } = drawCard({ hand: playerHand, deck });
               setTimeout(() => { playSound('draw'); setPlayerHand(updatedHand); setDeck(updatedDeck); }, 500);
             } else {
@@ -687,7 +780,7 @@ export function useBlackjackGame({
         case 's':
           flashPressedAction('stand');
           handleActionValidation('stand');
-          if (trainingModeRef.current !== 'basic') {
+          if (trainingModeRef.current !== 'basic' || fullHandModeRef.current) {
             playSound('stand');
             setTimeout(() => setPlayerTurn(false), 500);
           }
@@ -720,6 +813,35 @@ export function useBlackjackGame({
     return () => clearTimeout(t);
   }, [gamePhase, cancelHand]);
 
+  // ── Card counting quiz handling ──────────────────────────────────────────────
+
+  const submitCardCountingAnswer = useCallback((guesses) => {
+    if (!cardCountingQuiz) return;
+    const metric = cardCountingMetricRef.current;
+    const runningMatches = Math.round(guesses.running) === Math.round(cardCountingQuiz.runningCount);
+    const trueMatches    = Math.round(guesses.true) === Math.round(cardCountingQuiz.trueCount);
+    const isCorrect = metric === 'running' ? runningMatches
+      : metric === 'true' ? trueMatches
+      : runningMatches && trueMatches;
+
+    const next = { total: cardCountingStatsRef.current.total + 1, correct: cardCountingStatsRef.current.correct + (isCorrect ? 1 : 0) };
+    cardCountingStatsRef.current = next;
+    setCardCountingStats(next);
+    onRoundEnd?.({
+      bankroll: bankrollRef.current,
+      stats: statsRef.current,
+      ...getPersistedTrainingFields(),
+    });
+    setCardCountingFeedback({ correct: isCorrect, guesses, actual: cardCountingQuiz, metric });
+    setCardCountingQuiz(null);
+    setGamePhase('card-counting-result');
+  }, [cardCountingQuiz, onRoundEnd]);
+
+  const handleCardCountingResultClose = useCallback(() => {
+    setCardCountingFeedback(null);
+    setGamePhase('betting');
+  }, []);
+
   // ── Auto-deal next hand in training mode ─────────────────────────────────────
 
   useEffect(() => {
@@ -745,6 +867,7 @@ export function useBlackjackGame({
     gamePhase, winner, resultAmount, resultMessage, statusMessage, lastBetAmount,
     stats, strategyStats, expectedAction, actionFeedback, trainingFeedback,
     splitHand2, splitHand1Completed, splitBet, splitHand1Bet, splitResults, pressedAction,
+    cardCountingStats, cardCountingQuiz, cardCountingFeedback,
     // DeckContext values (re-exported for convenience)
     playerHand, dealerHand, bankroll, currentBet,
     // Derived
@@ -752,5 +875,6 @@ export function useBlackjackGame({
     // Handlers
     dealCards, cancelHand, handleDouble, handleStand, handleSplit, handleResign,
     handleReset, handleResultsClose, handleActionValidation,
+    submitCardCountingAnswer, handleCardCountingResultClose,
   };
 }
