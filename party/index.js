@@ -232,15 +232,23 @@ export default class BlackjackParty {
   async reportMultiplayerWin(username) {
     const baseUrl = this.room.env?.NEXT_APP_URL;
     const secret = this.room.env?.PARTY_SHARED_SECRET;
-    if (!baseUrl || !secret) return;
+    if (!baseUrl || !secret) {
+      console.error('reportMultiplayerWin: NEXT_APP_URL or PARTY_SHARED_SECRET not configured — win not recorded for', username);
+      return;
+    }
     try {
-      await fetch(`${baseUrl}/api/game/multiplayer-win`, {
+      const res = await fetch(`${baseUrl}/api/game/multiplayer-win`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-party-secret': secret },
         body: JSON.stringify({ username }),
       });
-    } catch {
-      // A failed leaderboard update shouldn't affect gameplay.
+      if (!res.ok) {
+        console.error(`reportMultiplayerWin: ${res.status} for ${username}`);
+      }
+    } catch (err) {
+      // A failed leaderboard update shouldn't affect gameplay — but log it so
+      // silent misconfiguration (wrong secret, unreachable app URL) is visible.
+      console.error('reportMultiplayerWin: request failed for', username, err);
     }
   }
 
@@ -738,13 +746,6 @@ export default class BlackjackParty {
       }
     }
 
-    for (const player of this.players) {
-      if (player.isBot) continue;
-      const won = player.result === 'Player Wins' || player.result === 'Blackjack!' ||
-        player.splitResult === 'Player Wins' || player.splitResult === 'Blackjack!';
-      if (won) this.reportMultiplayerWin(player.name);
-    }
-
     this.status = 'round-end';
     this.broadcast({ type: 'game:round-end', state: this.publicState() });
 
@@ -775,6 +776,9 @@ export default class BlackjackParty {
       const winners = this.checkWinCondition();
       if (winners) {
         this.status = 'game-over';
+        for (const winner of winners) {
+          if (!winner.isBot) this.reportMultiplayerWin(winner.name);
+        }
         this.broadcast({
           type: 'game:over',
           winners: winners.map(w => ({ id: w.id, name: w.name, bankroll: w.bankroll })),

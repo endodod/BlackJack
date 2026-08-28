@@ -3,6 +3,7 @@ import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { consumeStatsPrefetch } from '../../src/lib/statsCache'
 import './profile.css'
 
 export default function ProfilePage() {
@@ -20,12 +21,23 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (status !== 'authenticated') return
-    fetch('/api/user/stats')
-      .then(r => r.ok ? r.json() : null)
-      .then(data => setStats(data))
+    const prefetched = consumeStatsPrefetch()
+    const statsPromise = prefetched ?? fetch('/api/user/stats').then(r => r.ok ? r.json() : null)
+    statsPromise.then(data => setStats(data))
   }, [status])
 
-  if (status === 'loading' || (status === 'authenticated' && stats === undefined)) return null
+  if (status === 'loading' || (status === 'authenticated' && stats === undefined)) {
+    return (
+      <div className="profile-page">
+        <div className="profile-container">
+          <div className="profile-loading">
+            <span className="profile-loading-spinner" />
+            <span>Loading profile…</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (!session?.user || !stats) {
     return (
@@ -40,7 +52,7 @@ export default function ProfilePage() {
     )
   }
 
-  const { username, bankroll, hands, wins, pushes, resets, blackjacks, trainingHands, trainingCorrect, cardCountingHands, cardCountingCorrect } = stats
+  const { username, bankroll, hands, wins, pushes, resets, blackjacks, trainingHands, trainingCorrect, cardCountingHands, cardCountingCorrect, multiplayerWins } = stats
   const winRate = hands > 0 ? Math.round((wins / hands) * 100) : 0
   const trainingAccuracy = trainingHands > 0 ? Math.round((trainingCorrect / trainingHands) * 100) : null
   const cardCountingAccuracy = cardCountingHands > 0 ? Math.round((cardCountingCorrect / cardCountingHands) * 100) : null
@@ -170,6 +182,18 @@ export default function ProfilePage() {
               <span className="profile-stat-value">
                 {cardCountingAccuracy !== null ? `${cardCountingAccuracy}%` : '—'}
               </span>
+            </div>
+          </div>
+        </section>
+
+        {/* Multiplayer Stats */}
+        <section className="profile-section">
+          <h2 className="profile-section-title">Multiplayer</h2>
+          <p className="profile-section-note">Games won requires the host to set a Highest Bankroll or Target Bankroll win condition — the default Freeplay mode has no game winner.</p>
+          <div className="profile-stats-grid">
+            <div className="profile-stat">
+              <span className="profile-stat-label">Games Won</span>
+              <span className="profile-stat-value">{multiplayerWins ?? 0}</span>
             </div>
           </div>
         </section>

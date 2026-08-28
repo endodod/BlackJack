@@ -16,6 +16,7 @@ import StrategyTableModal from "./components/StrategyTableModal";
 import CardCountingTutorialModal from "./components/CardCountingTutorialModal";
 import LeaderboardModal from "./components/LeaderboardModal";
 import TestDealPanel from "./components/TestDealPanel";
+import { prefetchStats } from "./lib/statsCache";
 import Link from 'next/link';
 
 // gamePhase values: 'betting' | 'dealing' | 'player' | 'dealer' | 'pausing' | 'result'
@@ -101,9 +102,12 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
   return (
     <div className="game-table">
       {/* ── Header ── */}
-      <header className="game-header">
-        <div className="game-header-left">
+      <header className="game-header game-header-grid">
+        <div className="game-header-section header-section-title">
           <Link href="/" className="game-title">Blackjack</Link>
+        </div>
+
+        <div className="game-header-section header-section-modes">
           <nav className="game-nav">
             {[
               ['off',   'Freeplay'],
@@ -131,6 +135,9 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
               </button>
             )}
           </nav>
+        </div>
+
+        <div className="game-header-section header-section-leaderboard">
           <button className="nav-btn nav-btn-highlight" onClick={() => setShowLeaderboard(true)}>
             Leaderboard
           </button>
@@ -162,7 +169,13 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
             </div>
           )}
           {session?.user?.username && (
-            <Link href="/profile" className="hud-item hud-user hud-user-link">{session.user.username}</Link>
+            <Link href="/profile" className="hud-item hud-user hud-user-link" onClick={prefetchStats}>
+              <svg className="icon-profile" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="8" r="4"/>
+                <path d="M4 20.5c0-4.5 3.6-8 8-8s8 3.5 8 8"/>
+              </svg>
+              {session.user.username}
+            </Link>
           )}
           <div className="menu-container" ref={menuRef}>
             <button
@@ -228,8 +241,14 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
                     <Link
                       href="/profile"
                       className="menu-profile-link"
-                      onClick={() => setMenuOpen(false)}
-                    >{session.user.username}</Link>
+                      onClick={() => { setMenuOpen(false); prefetchStats(); }}
+                    >
+                      <svg className="icon-profile" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="8" r="4"/>
+                        <path d="M4 20.5c0-4.5 3.6-8 8-8s8 3.5 8 8"/>
+                      </svg>
+                      {session.user.username}
+                    </Link>
                   </div>
                 )}
                 <div className="menu-mobile-divider" />
@@ -281,7 +300,7 @@ function App({ initialStats = { hands: 0, wins: 0, losses: 0, pushes: 0, totalIn
                   <Link
                     href="/profile"
                     className="menu-account-btn"
-                    onClick={() => setMenuOpen(false)}
+                    onClick={() => { setMenuOpen(false); prefetchStats(); }}
                   >Account</Link>
                 )}
                 <button className="menu-leaderboard-btn" onClick={() => { setMenuOpen(false); setShowLeaderboard(true); }}>

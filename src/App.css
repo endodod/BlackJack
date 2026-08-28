@@ -35,6 +35,27 @@
   gap: 0.75em;
 }
 
+/* Main navbar only (not the multiplayer table header): split the header
+   evenly between title, gamemodes and leaderboard; bankroll sits with the
+   account group on the right, next to the profile icon. */
+@media (min-width: 930px) {
+  .game-header-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr) auto;
+  }
+}
+
+.game-header-section {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+.header-section-title {
+  justify-content: flex-start;
+}
+
 .game-nav {
   display: flex;
   gap: 0.4em;
@@ -72,6 +93,8 @@
   border-color: rgba(245, 158, 11, 0.4);
   background: rgba(245, 158, 11, 0.06);
   text-shadow: 0 0 12px rgba(245, 158, 11, 0.4);
+  font-size: 1em;
+  padding: 0.5em 1.3em;
 }
 
 .nav-btn-highlight:hover:not(:disabled) {
@@ -745,6 +768,9 @@
 }
 
 .hud-user-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
   text-decoration: none;
   color: inherit;
   cursor: pointer;
@@ -755,6 +781,13 @@
   color: #f59e0b;
   border-color: rgba(245, 158, 11, 0.5);
   background-color: rgba(245, 158, 11, 0.08);
+}
+
+.icon-profile {
+  width: 1.1em;
+  height: 1.1em;
+  flex-shrink: 0;
+  opacity: 0.85;
 }
 
 .menu-auth-btn {
@@ -1196,14 +1229,15 @@ kbd.key-hint {
   }
 
   /* Column 1: title only — hide desktop nav */
-  .game-header-left {
+  .game-header-left,
+  .header-section-title {
     flex-wrap: nowrap;
     gap: 0;
     min-width: 0;
   }
 
-  .game-header-left .game-nav,
-  .game-header-left .nav-btn-highlight {
+  .header-section-modes,
+  .header-section-leaderboard {
     display: none;
   }
 
@@ -1390,7 +1424,9 @@ kbd.key-hint {
   }
 
   .menu-profile-link {
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
     background: rgba(245, 158, 11, 0.08);
     border: 1.5px solid rgba(245, 158, 11, 0.25);
     border-radius: 8px;

@@ -167,7 +167,7 @@ export default function LeaderboardModal({ onClose }) {
             ? trainingMetric === 'accuracy'
               ? 'Minimum 5 training hands to qualify'
               : 'Minimum 5 card counting checks to qualify'
-            : 'Multiplayer rounds won'}
+            : 'Multiplayer games won (requires Highest/Target Bankroll mode)'}
         </p>
 
         <div className="lb-list">
